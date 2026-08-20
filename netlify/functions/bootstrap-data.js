@@ -1,12 +1,12 @@
 const { requireUser, isAdmin } = require("./shared/auth");
 const { handleError, json, methodNotAllowed } = require("./shared/http");
-const { loadData, scopedCustomers, withTerritories } = require("./shared/store");
+const { loadMasterData, scopedCustomers, withTerritories } = require("./shared/store");
 
 exports.handler = async (event) => {
   if (event.httpMethod !== "GET") return methodNotAllowed();
 
   try {
-    const data = await loadData(event);
+    const data = await loadMasterData();
     const user = await requireUser(event, data);
     const customers = scopedCustomers(data, user);
     const customerIds = new Set(customers.map((customer) => customer.id));
@@ -21,9 +21,9 @@ exports.handler = async (event) => {
       employees,
       products: data.products,
       customers,
-      prescriptions: data.prescriptions.filter((item) => customerIds.has(item.customerId)),
-      sales: data.sales.filter((item) => customerIds.has(item.customerId)),
-      tenders: data.tenders.filter((item) => customerIds.has(item.customerId)),
+      prescriptions: [],
+      sales: [],
+      tenders: [],
       dailyReports: manager ? data.dailyReports : data.dailyReports.filter((item) => item.employeeId === user.id),
       kpiTargets: manager ? data.kpiTargets : data.kpiTargets.filter((item) => item.employeeId === user.id)
     });

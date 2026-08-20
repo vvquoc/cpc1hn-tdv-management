@@ -1,7 +1,7 @@
-const { assertDatabaseCustomerAccess, requireDatabaseUser, requireUser } = require("./shared/auth");
+const { assertDatabaseCustomerAccess, requireDatabaseUser } = require("./shared/auth");
 const { getPool } = require("./shared/db");
 const { handleError, json, methodNotAllowed, parseBody } = require("./shared/http");
-const { loadData, scopedCustomers } = require("./shared/store");
+const { pagination, scope } = require("./shared/reporting");
 
 function fail(message) {
   const error = new Error(message);
@@ -13,10 +13,21 @@ function fail(message) {
 exports.handler = async (event) => {
   try {
     if (event.httpMethod === "GET") {
-      const data = await loadData();
-      const user = await requireUser(event, data);
-      const customerIds = new Set(scopedCustomers(data, user).map((customer) => customer.id));
-      return json(200, { prescriptions: data.prescriptions.filter((item) => customerIds.has(item.customerId)) });
+      const user = await requireDatabaseUser(event);
+      const { page, pageSize, offset, query } = pagination(event);
+      const itemScope = scope(user, "r");
+      const params = itemScope.params.slice();
+      const filters = [itemScope.sql];
+      if (/^\d{4}-\d{2}$/.test(query.period || "")) {
+        params.push(query.period);
+        filters.push(`to_char(r.ngay_bao_cao,'YYYY-MM')=$${params.length}`);
+      }
+      params.push(pageSize, offset);
+      const rows = (await getPool().query(`select r.*,to_char(r.ngay_bao_cao,'YYYY-MM-DD') as report_date,k.ten_khach_hang,p.ten_san_pham,n.ten_nhan_vien,count(*) over()::int as total
+        from tb_ke_don r join tb_khach_hang k on k.id_khach_hang=r.id_khach_hang
+        join tb_san_pham p on p.id_san_pham=r.id_san_pham join tb_nhan_su n on n.id_nhan_vien=r.id_nhan_vien
+        where ${filters.join(" and ")} order by r.ngay_bao_cao desc,r.created_at desc limit $${params.length - 1} offset $${params.length}`, params)).rows;
+      return json(200, { items: rows.map((r) => ({ id: r.id_giao_dich, date: r.report_date, employeeId: r.id_nhan_vien, employeeName: r.ten_nhan_vien, customerId: r.id_khach_hang, customerName: r.ten_khach_hang, productId: r.id_san_pham, productName: r.ten_san_pham, quantity: r.so_luong_ke_don, amount: Number(r.doanh_so_phat_sinh) })), total: rows[0]?.total || 0, page, pageSize });
     }
     if (event.httpMethod !== "POST") return methodNotAllowed();
 

@@ -9,11 +9,23 @@ const statusLabel = {
   TruotThau: "Trượt thầu"
 };
 
-const demoUsers = window.CPC1_SEED.employees;
 let state = structuredClone(window.CPC1_SEED);
 let apiReady = false;
 let authToken = localStorage.getItem(STORAGE_TOKEN_KEY) || "";
 let authUser;
+const pageSize = 20;
+const operationState = {
+  prescriptions: { page: 1, total: 0, items: [] },
+  sales: { page: 1, total: 0, items: [] },
+  tenders: { page: 1, total: 0, items: [] }
+};
+const adminState = {
+  activeTab: "employee",
+  pageSize: 15,
+  pages: { employee: 1, product: 1, customer: 1, territory: 1 },
+  searches: { employee: "", product: "", customer: "", territory: "" }
+};
+let dashboardState = { period: "", availablePeriods: [], metrics: {} };
 try {
   authUser = JSON.parse(localStorage.getItem(STORAGE_USER_KEY) || "null");
 } catch {
@@ -174,6 +186,12 @@ async function loadData() {
       state.employeeCustomers = assignments.employeeCustomers || [];
       state.accounts = assignments.accounts || [];
     }
+    await loadDashboard();
+    await Promise.all([
+      loadOperationPage("prescriptions", 1),
+      loadOperationPage("sales", 1),
+      loadOperationPage("tenders", 1)
+    ]);
     showApp();
     showNotice("");
   } catch (error) {
@@ -190,25 +208,56 @@ async function loadData() {
   render();
 }
 
+async function loadDashboard(period = "") {
+  const query = period ? `?period=${encodeURIComponent(period)}` : "";
+  dashboardState = await api(`/api/v1/dashboard${query}`);
+}
+
+async function loadOperationPage(resource, page = 1) {
+  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  if (dashboardState.period && resource !== "tenders") params.set("period", dashboardState.period);
+  const payload = await api(`/api/v1/${resource}?${params}`);
+  operationState[resource] = { page: payload.page, total: payload.total, items: payload.items || [] };
+}
+
+async function refreshReporting(period = dashboardState.period) {
+  await loadDashboard(period);
+  await Promise.all([
+    loadOperationPage("prescriptions", 1),
+    loadOperationPage("sales", 1),
+    loadOperationPage("tenders", 1)
+  ]);
+  render();
+}
+
+function paginationMarkup(resource, data, admin = false) {
+  const size = admin ? adminState.pageSize : pageSize;
+  const pages = Math.max(1, Math.ceil(data.total / size));
+  const page = Math.min(data.page, pages);
+  return `<span>${html(data.total)} bản ghi · Trang ${page}/${pages}</span>
+    <button type="button" class="secondary-button" data-page-resource="${resource}" data-page="${page - 1}" ${page <= 1 ? "disabled" : ""} aria-label="Trang trước">‹</button>
+    <button type="button" class="secondary-button" data-page-resource="${resource}" data-page="${page + 1}" ${page >= pages ? "disabled" : ""} aria-label="Trang sau">›</button>`;
+}
+
 function render() {
   const employee = activeEmployee();
   const customers = state.customers || [];
   const activeCustomers = customers.filter((customer) => customer.status !== "Inactive");
   const activeProducts = (state.products || []).filter((product) => product.status !== "Inactive");
-  const customerIds = customers.map((item) => item.id);
-  const prescriptions = (state.prescriptions || []).filter((item) => customerIds.includes(item.customerId));
-  const sales = (state.sales || []).filter((item) => customerIds.includes(item.customerId));
-  const tenders = (state.tenders || []).filter((item) => customerIds.includes(item.customerId));
-  const lostSales = computeLostSales(customers);
+  const prescriptions = operationState.prescriptions.items;
+  const sales = operationState.sales.items;
+  const tenders = operationState.tenders.items;
+  const metrics = dashboardState.metrics || {};
 
   document.querySelector("#activeAccount").textContent = `${employee.name} · ${roleLabel[employee.role] || employee.role}`;
   document.querySelector("#scopeLabel").textContent = `${employee.name} · ${roleLabel[employee.role] || employee.role} · ${(employee.territoryIds || []).join(", ")}`;
-  document.querySelector("#metricSales").textContent = currency.format(
-    sales.filter((sale) => sale.period === currentPeriod()).reduce((sum, sale) => sum + Number(sale.amount), 0)
-  );
-  document.querySelector("#metricRx").textContent = prescriptions.reduce((sum, item) => sum + Number(item.quantity), 0);
-  document.querySelector("#metricTenders").textContent = tenders.filter((item) => item.status !== "TrungThau" && item.status !== "TruotThau").length;
-  document.querySelector("#metricLostSales").textContent = lostSales.length;
+  document.querySelector("#metricSales").textContent = currency.format(metrics.sales || 0);
+  document.querySelector("#metricRx").textContent = Number(metrics.prescriptionQuantity || 0).toLocaleString("vi-VN");
+  document.querySelector("#metricTenders").textContent = metrics.openTenders || 0;
+  document.querySelector("#metricLostSales").textContent = metrics.lostSales || 0;
+  const reportingPeriod = document.querySelector("#reportingPeriod");
+  reportingPeriod.innerHTML = (dashboardState.availablePeriods || []).map((period) => `<option value="${html(period)}">${html(period)}</option>`).join("") || `<option value="${html(dashboardState.period)}">${html(dashboardState.period)}</option>`;
+  reportingPeriod.value = dashboardState.period;
 
   document.querySelectorAll("form:not(#customerAssignForm) select[name='customerId']").forEach((select) => {
     setOptions(select, activeCustomers, (customer) => customer.name);
@@ -218,38 +267,28 @@ function render() {
   });
 
   document.querySelector("#prescriptionRows").innerHTML = prescriptions
-    .slice()
-    .reverse()
     .map((item) => {
-      const customer = byId(state.customers, item.customerId) || {};
-      const product = byId(state.products, item.productId) || {};
-      const owner = byId(state.employees, item.employeeId) || {};
-      const amount = item.amount || Number(item.quantity) * Number(product.prescriptionPrice || 0);
-      return `<tr><td>${html(item.date)}</td><td>${html(owner.name || item.employeeId)}</td><td>${html(customer.name || item.customerId)}</td><td>${html(product.name || item.productId)}</td><td>${html(item.quantity)}</td><td>${html(currency.format(amount))}</td></tr>`;
+      return `<tr><td>${html(item.date)}</td><td>${html(item.employeeName || item.employeeId)}</td><td>${html(item.customerName || item.customerId)}</td><td>${html(item.productName || item.productId)}</td><td>${html(item.quantity)}</td><td>${html(currency.format(item.amount || 0))}</td></tr>`;
     })
-    .join("");
+    .join("") || '<tr><td colspan="6">Chưa có dữ liệu trong kỳ.</td></tr>';
+  document.querySelector("#prescriptionPagination").innerHTML = paginationMarkup("prescriptions", operationState.prescriptions);
 
   document.querySelector("#salesRows").innerHTML = sales
-    .slice()
-    .reverse()
     .map((item) => {
-      const customer = byId(state.customers, item.customerId) || {};
-      const product = byId(state.products, item.productId) || {};
-      return `<tr><td>${html(item.period)}</td><td>${html(customer.name || item.customerId)}</td><td>${html(product.name || item.productId)}</td><td>${html(currency.format(item.amount))}</td></tr>`;
+      return `<tr><td>${html(item.period)}</td><td>${html(item.customerName || item.customerId)}</td><td>${html(item.productName || item.productId)}</td><td>${html(currency.format(item.amount))}</td></tr>`;
     })
-    .join("");
+    .join("") || '<tr><td colspan="4">Chưa có dữ liệu trong kỳ.</td></tr>';
+  document.querySelector("#salesPagination").innerHTML = paginationMarkup("sales", operationState.sales);
 
   document.querySelector("#tenderRows").innerHTML = tenders
     .map((item) => {
-      const customer = byId(state.customers, item.customerId) || {};
-      const product = byId(state.products, item.productId) || {};
-      const owner = byId(state.employees, item.employeeId) || {};
       const statusClass = item.status === "DangLamHoSo" ? "status-warn" : item.status === "TrungThau" ? "status-win" : "";
-      return `<tr><td>${html(item.id)}</td><td>${html(customer.name || item.customerId)}</td><td>${html(product.name || item.productId)}</td><td><span class="status ${statusClass}">${html(statusLabel[item.status] || item.status)}</span></td><td>${html(item.dueDate || "")}</td><td>${html(owner.name || item.employeeId)}</td></tr>`;
+      return `<tr><td>${html(item.id)}</td><td>${html(item.customerName || item.customerId)}</td><td>${html(item.productName || item.productId)}</td><td><span class="status ${statusClass}">${html(statusLabel[item.status] || item.status)}</span></td><td>${html(item.dueDate || "")}</td><td>${html(item.employeeName || item.employeeId)}</td></tr>`;
     })
-    .join("");
+    .join("") || '<tr><td colspan="6">Chưa có dữ liệu thầu.</td></tr>';
+  document.querySelector("#tenderPagination").innerHTML = paginationMarkup("tenders", operationState.tenders);
 
-  renderAlerts(lostSales, []);
+  renderAlerts([], []);
   renderAdmin();
 }
 
@@ -382,12 +421,34 @@ function fillForm(formId, data) {
   });
 }
 
+function adminPage(resource, items, textFor) {
+  const search = adminState.searches[resource].toLocaleLowerCase("vi");
+  const filtered = search
+    ? items.filter((item) => textFor(item).toLocaleLowerCase("vi").includes(search))
+    : items;
+  const pages = Math.max(1, Math.ceil(filtered.length / adminState.pageSize));
+  const page = Math.min(adminState.pages[resource], pages);
+  adminState.pages[resource] = page;
+  return {
+    items: filtered.slice((page - 1) * adminState.pageSize, page * adminState.pageSize),
+    page,
+    total: filtered.length
+  };
+}
+
 function renderAdmin() {
   const adminVisible = canAdmin();
   document.querySelectorAll("[data-admin-only]").forEach((element) => {
     element.hidden = !adminVisible;
   });
   if (!adminVisible) return;
+
+  document.querySelectorAll("[data-admin-panel]").forEach((panel) => {
+    panel.hidden = panel.dataset.adminPanel !== adminState.activeTab;
+  });
+  document.querySelectorAll("[data-admin-tab]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.adminTab === adminState.activeTab);
+  });
 
   const employees = state.employees || [];
   const activeEmployees = employees.filter((employee) => employee.status !== "Inactive");
@@ -396,6 +457,9 @@ function renderAdmin() {
   const products = state.products || [];
   const customers = state.customers || [];
   const activeCustomers = customers.filter((customer) => customer.status !== "Inactive");
+  const accounts = state.accounts || [];
+  const accountByEmployee = new Map(accounts.map((account) => [account.employeeId, account]));
+  document.querySelector("#accountSummary").textContent = `${employees.length} hồ sơ nhân sự · ${accounts.length} tài khoản đăng nhập`;
 
   document.querySelectorAll("#territoryAssignForm select[name='employeeId'], #customerAssignForm select[name='employeeId']").forEach((select) => {
     setOptions(select, activeEmployees, (employee) => `${employee.name} · ${roleLabel[employee.role] || employee.role}`);
@@ -405,19 +469,23 @@ function renderAdmin() {
   });
   setOptions(document.querySelector("#customerAssignForm select[name='customerId']"), activeCustomers, (customer) => customer.name);
 
-  document.querySelector("#employeeAdminList").innerHTML = employees
+  const employeePage = adminPage("employee", employees, (employee) => `${employee.id} ${employee.name} ${employee.email} ${accountByEmployee.get(employee.id)?.username || ""}`);
+  document.querySelector("#employeeAdminList").innerHTML = employeePage.items
     .map((employee) => `
       <li>
         <strong>${html(employee.name)}</strong><br />
-        ${html(employee.id)} · ${html(employee.email)} · ${html(roleLabel[employee.role] || employee.role)} · ${html(employee.status || "Active")}
+        ${html(employee.id)} · ${html(roleLabel[employee.role] || employee.role)} · ${html(employee.status || "Active")}<br />
+        ${accountByEmployee.has(employee.id) ? `Tài khoản: <strong>${html(accountByEmployee.get(employee.id).username)}</strong>` : '<span class="account-missing">Chưa có tài khoản đăng nhập</span>'}
         <div class="inline-actions">
           <button class="secondary-button" data-edit-employee="${html(employee.id)}">Sửa</button>
           <button class="danger-button" data-deactivate-employee="${html(employee.id)}">Xóa</button>
         </div>
       </li>`)
     .join("");
+  document.querySelector("#employeeAdminPagination").innerHTML = paginationMarkup("admin:employee", employeePage, true);
 
-  document.querySelector("#productAdminList").innerHTML = products
+  const productPage = adminPage("product", products, (product) => `${product.id} ${product.name} ${product.dosageForm}`);
+  document.querySelector("#productAdminList").innerHTML = productPage.items
     .map((product) => `
       <li>
         <strong>${html(product.name)}</strong><br />
@@ -428,8 +496,10 @@ function renderAdmin() {
         </div>
       </li>`)
     .join("");
+  document.querySelector("#productAdminPagination").innerHTML = paginationMarkup("admin:product", productPage, true);
 
-  document.querySelector("#customerAdminList").innerHTML = customers
+  const customerPage = adminPage("customer", customers, (customer) => `${customer.id} ${customer.name} ${customer.type}`);
+  document.querySelector("#customerAdminList").innerHTML = customerPage.items
     .map((customer) => `
       <li>
         <strong>${html(customer.name)}</strong><br />
@@ -440,8 +510,10 @@ function renderAdmin() {
         </div>
       </li>`)
     .join("");
+  document.querySelector("#customerAdminPagination").innerHTML = paginationMarkup("admin:customer", customerPage, true);
 
-  document.querySelector("#territoryAdminList").innerHTML = territories
+  const territoryPage = adminPage("territory", territories, (territory) => `${territory.id} ${territory.name} ${territory.region}`);
+  document.querySelector("#territoryAdminList").innerHTML = territoryPage.items
     .map((territory) => `
       <li>
         <strong>${html(territory.name)}</strong><br />
@@ -452,6 +524,7 @@ function renderAdmin() {
         </div>
       </li>`)
     .join("");
+  document.querySelector("#territoryAdminPagination").innerHTML = paginationMarkup("admin:territory", territoryPage, true);
 
   document.querySelector("#territoryAssignmentList").innerHTML = (state.employeeTerritories || [])
     .map((assignment) => {
@@ -483,6 +556,44 @@ function renderAdmin() {
 }
 
 function bindForms() {
+  document.querySelector("#reportingPeriod").addEventListener("change", async (event) => {
+    try {
+      await refreshReporting(event.target.value);
+    } catch (error) {
+      showNotice(error.message);
+    }
+  });
+
+  document.querySelector("main").addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-page-resource]");
+    if (!button || button.disabled) return;
+    const resource = button.dataset.pageResource;
+    const page = Number(button.dataset.page);
+    if (resource.startsWith("admin:")) {
+      const adminResource = resource.split(":")[1];
+      adminState.pages[adminResource] = page;
+      renderAdmin();
+      return;
+    }
+    try {
+      await loadOperationPage(resource, page);
+      render();
+    } catch (error) {
+      showNotice(error.message);
+    }
+  });
+
+  document.querySelector("#admin").addEventListener("input", (event) => {
+    const resource = event.target.dataset.adminSearch;
+    if (!resource) return;
+    adminState.searches[resource] = event.target.value;
+    adminState.pages[resource] = 1;
+    renderAdmin();
+    const input = document.querySelector(`[data-admin-search='${resource}']`);
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  });
+
   document.querySelector("#loginForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     const target = event.currentTarget;
@@ -530,6 +641,7 @@ function bindForms() {
 
     const target = event.currentTarget;
     const form = new FormData(target);
+    const period = String(form.get("date")).slice(0, 7);
     try {
       await api("/api/v1/prescriptions", {
         method: "POST",
@@ -542,7 +654,7 @@ function bindForms() {
       });
       target.reset();
       setDefaultDates();
-      await loadData();
+      await refreshReporting(period);
       showNotice("Đã lưu kê đơn.");
     } catch (error) {
       showNotice(error.message);
@@ -555,6 +667,7 @@ function bindForms() {
 
     const target = event.currentTarget;
     const form = new FormData(target);
+    const period = form.get("period");
     try {
       await api("/api/v1/sales", {
         method: "POST",
@@ -567,7 +680,7 @@ function bindForms() {
       });
       target.reset();
       setDefaultDates();
-      await loadData();
+      await refreshReporting(period);
       showNotice("Đã lưu doanh số.");
     } catch (error) {
       showNotice(error.message);
@@ -585,7 +698,7 @@ function bindForms() {
         body: JSON.stringify(getFormObject(target))
       });
       target.reset();
-      await loadData();
+      await refreshReporting();
       showNotice("Đã lưu gói thầu.");
     } catch (error) {
       showNotice(error.message);
@@ -663,6 +776,12 @@ function bindForms() {
   document.querySelector("#admin").addEventListener("click", async (event) => {
     const button = event.target.closest("button");
     if (!button) return;
+
+    if (button.dataset.adminTab) {
+      adminState.activeTab = button.dataset.adminTab;
+      renderAdmin();
+      return;
+    }
 
     const employeeId = button.dataset.editEmployee || button.dataset.deactivateEmployee;
     const productId = button.dataset.editProduct || button.dataset.deactivateProduct;

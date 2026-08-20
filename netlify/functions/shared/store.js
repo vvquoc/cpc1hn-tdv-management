@@ -37,9 +37,11 @@ async function loadData() {
     pool.query("select username, id_nhan_vien, password_salt, password_hash, iterations from auth_credentials")
   ]);
   const [revisionResult, territoriesResult, employeesResult, productsResult, customersResult, employeeTerritoriesResult, employeeCustomersResult, prescriptionsResult, manualSalesResult, dataSaleResult, tendersResult, dailyReportsResult, kpiTargetsResult, credentialsResult] = results;
-  const dataSaleKeys = new Set(dataSaleResult.rows.map((row) => `${row.thang_nam}|${row.id_khach_hang}|${row.id_san_pham}`));
-  const salesRows = manualSalesResult.rows.filter((row) => !dataSaleKeys.has(`${row.thang_nam}|${row.id_khach_hang}|${row.id_san_pham}`));
-  salesRows.push(...dataSaleResult.rows.map((row) => ({ ...row, source: "DATA_SALE" })));
+  const manualSalesKeys = new Set(manualSalesResult.rows.map((row) => `${row.thang_nam}|${row.id_khach_hang}|${row.id_san_pham}`));
+  const salesRows = manualSalesResult.rows.slice();
+  salesRows.push(...dataSaleResult.rows
+    .filter((row) => !manualSalesKeys.has(`${row.thang_nam}|${row.id_khach_hang}|${row.id_san_pham}`))
+    .map((row) => ({ ...row, source: "DATA_SALE" })));
 
   return {
     revision: Number(revisionResult.rows[0]?.revision || 0),
@@ -56,6 +58,33 @@ async function loadData() {
     kpiTargets: kpiTargetsResult.rows.map((r) => ({ id: r.id, period: r.thang_nam, employeeId: r.id_nhan_vien, territoryId: r.id_dia_ban || "", productId: r.id_san_pham || "", targetSales: numberValue(r.target_sales), targetPrescriptions: Number(r.target_prescriptions) })),
     credentials: credentialsResult.rows.map((r) => ({ username: r.username, employeeId: r.id_nhan_vien, passwordSalt: r.password_salt, passwordHash: r.password_hash, iterations: r.iterations })),
     sessions: []
+  };
+}
+
+async function loadMasterData() {
+  const pool = getPool();
+  const results = await Promise.all([
+    pool.query("select revision from app_state_revision where id=1"),
+    pool.query("select id_dia_ban,ten_dia_ban,khu_vuc,trang_thai from tb_dia_ban order by ten_dia_ban"),
+    pool.query("select id_nhan_vien,ten_nhan_vien,email,chuc_vu,trang_thai,ma_nhan_vien_sale from tb_nhan_su order by ten_nhan_vien"),
+    pool.query("select id_san_pham,ten_san_pham,hoat_chat,dang_bao_che,mo_ta_dang_bao_che,quy_cach,gia_ke_don,trang_thai,ma_hang_hoa_sale,don_vi_tinh_sale from tb_san_pham order by ten_san_pham"),
+    pool.query("select id_khach_hang,ten_khach_hang,loai_khach_hang,dia_chi,dien_thoai,id_dia_ban,trang_thai,ma_khach_hang_sale,nhom_khach_hang_sale from tb_khach_hang order by ten_khach_hang"),
+    pool.query("select id_nhan_vien,id_dia_ban,is_primary from employee_territories"),
+    pool.query("select id_nhan_vien,id_khach_hang from employee_customers"),
+    pool.query("select id,report_date,id_nhan_vien,summary,kpi_note from daily_reports where report_date >= current_date - interval '31 days' order by report_date desc"),
+    pool.query("select id,thang_nam,id_nhan_vien,id_dia_ban,id_san_pham,target_sales,target_prescriptions from kpi_targets order by thang_nam desc")
+  ]);
+  const [revision, territories, employees, products, customers, employeeTerritories, employeeCustomers, dailyReports, kpiTargets] = results;
+  return {
+    revision: Number(revision.rows[0]?.revision || 0),
+    territories: territories.rows.map((r) => ({ id: r.id_dia_ban, name: r.ten_dia_ban, region: r.khu_vuc, status: r.trang_thai })),
+    employees: employees.rows.map((r) => ({ id: r.id_nhan_vien, name: r.ten_nhan_vien, email: r.email || "", role: r.chuc_vu, status: r.trang_thai, saleCode: r.ma_nhan_vien_sale })),
+    products: products.rows.map((r) => ({ id: r.id_san_pham, name: r.ten_san_pham, activeIngredient: r.hoat_chat || "", dosageCode: r.dang_bao_che, dosageForm: r.mo_ta_dang_bao_che, packageSpec: r.quy_cach || "", prescriptionPrice: numberValue(r.gia_ke_don), status: r.trang_thai, saleCode: r.ma_hang_hoa_sale, unit: r.don_vi_tinh_sale })),
+    customers: customers.rows.map((r) => ({ id: r.id_khach_hang, name: r.ten_khach_hang, type: r.loai_khach_hang, territoryId: r.id_dia_ban, address: r.dia_chi || "", phone: r.dien_thoai || "", status: r.trang_thai, saleCode: r.ma_khach_hang_sale, saleGroup: r.nhom_khach_hang_sale })),
+    employeeTerritories: employeeTerritories.rows.map((r) => ({ employeeId: r.id_nhan_vien, territoryId: r.id_dia_ban, isPrimary: r.is_primary })),
+    employeeCustomers: employeeCustomers.rows.map((r) => ({ employeeId: r.id_nhan_vien, customerId: r.id_khach_hang })),
+    dailyReports: dailyReports.rows.map((r) => ({ id: r.id, date: dateValue(r.report_date), employeeId: r.id_nhan_vien, summary: r.summary, kpiNote: r.kpi_note || "" })),
+    kpiTargets: kpiTargets.rows.map((r) => ({ id: r.id, period: r.thang_nam, employeeId: r.id_nhan_vien, territoryId: r.id_dia_ban || "", productId: r.id_san_pham || "", targetSales: numberValue(r.target_sales), targetPrescriptions: Number(r.target_prescriptions) }))
   };
 }
 
@@ -109,4 +138,4 @@ function hasCustomerAccess(data, user, customerId) {
   return scopedCustomers(data, user).some((r) => r.id === customerId);
 }
 
-module.exports = { loadData, saveData, isManager, withTerritories, scopedCustomers, hasCustomerAccess };
+module.exports = { loadData, loadMasterData, saveData, isManager, withTerritories, scopedCustomers, hasCustomerAccess };

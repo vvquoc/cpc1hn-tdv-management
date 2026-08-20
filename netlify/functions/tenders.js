@@ -1,7 +1,7 @@
-const { assertDatabaseCustomerAccess, requireDatabaseUser, requireUser } = require("./shared/auth");
+const { assertDatabaseCustomerAccess, requireDatabaseUser } = require("./shared/auth");
 const { getPool } = require("./shared/db");
 const { handleError, json, methodNotAllowed, parseBody } = require("./shared/http");
-const { loadData, scopedCustomers } = require("./shared/store");
+const { pagination, scope } = require("./shared/reporting");
 
 function fail(message) {
   const error = new Error(message);
@@ -13,10 +13,15 @@ function fail(message) {
 exports.handler = async (event) => {
   try {
     if (event.httpMethod === "GET") {
-      const data = await loadData();
-      const user = await requireUser(event, data);
-      const customerIds = new Set(scopedCustomers(data, user).map((customer) => customer.id));
-      return json(200, { tenders: data.tenders.filter((item) => customerIds.has(item.customerId)) });
+      const user = await requireDatabaseUser(event);
+      const { page, pageSize, offset } = pagination(event);
+      const itemScope = scope(user, "t");
+      const params = [...itemScope.params, pageSize, offset];
+      const rows = (await getPool().query(`select t.*,to_char(t.han_nop,'YYYY-MM-DD') as due_date,k.ten_khach_hang,p.ten_san_pham,n.ten_nhan_vien,count(*) over()::int as total
+        from tb_thau t join tb_khach_hang k on k.id_khach_hang=t.id_khach_hang
+        join tb_san_pham p on p.id_san_pham=t.id_san_pham join tb_nhan_su n on n.id_nhan_vien=t.id_nhan_vien
+        where ${itemScope.sql} order by t.ngay_cap_nhat desc,t.id_goi_thau limit $${params.length - 1} offset $${params.length}`, params)).rows;
+      return json(200, { items: rows.map((r) => ({ id: r.id_goi_thau, customerId: r.id_khach_hang, customerName: r.ten_khach_hang, productId: r.id_san_pham, productName: r.ten_san_pham, quantity: Number(r.so_luong_thau || 0), bidPrice: Number(r.gia_du_thau || 0), status: r.trang_thai, employeeId: r.id_nhan_vien, employeeName: r.ten_nhan_vien, dueDate: r.due_date || "" })), total: rows[0]?.total || 0, page, pageSize });
     }
     if (event.httpMethod !== "POST") return methodNotAllowed();
     const body = parseBody(event);

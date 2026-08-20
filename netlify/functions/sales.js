@@ -1,6 +1,7 @@
 const { assertDatabaseCustomerAccess, requireDatabaseUser } = require("./shared/auth");
 const { getPool } = require("./shared/db");
 const { handleError, json, methodNotAllowed, parseBody } = require("./shared/http");
+const { COMBINED_SALES_CTE, pagination, scope } = require("./shared/reporting");
 
 function fail(message) {
   const error = new Error(message);
@@ -10,9 +11,37 @@ function fail(message) {
 }
 
 exports.handler = async (event) => {
-  if (event.httpMethod !== "POST") return methodNotAllowed();
   try {
     const user = await requireDatabaseUser(event);
+    if (event.httpMethod === "GET") {
+      const { page, pageSize, offset, query } = pagination(event);
+      const salesScope = scope(user, "s");
+      const params = salesScope.params.slice();
+      const filters = [salesScope.sql];
+      if (/^\d{4}-\d{2}$/.test(query.period || "")) {
+        params.push(query.period);
+        filters.push(`s.thang_nam=$${params.length}`);
+      }
+      if (query.search) {
+        params.push(`%${String(query.search).trim()}%`);
+        filters.push(`(k.ten_khach_hang ilike $${params.length} or p.ten_san_pham ilike $${params.length})`);
+      }
+      params.push(pageSize, offset);
+      const sql = `with ${COMBINED_SALES_CTE}, filtered as (
+        select s.*,k.ten_khach_hang,p.ten_san_pham,n.ten_nhan_vien,count(*) over()::int as total
+        from combined_sales s
+        join tb_khach_hang k on k.id_khach_hang=s.id_khach_hang
+        join tb_san_pham p on p.id_san_pham=s.id_san_pham
+        join tb_nhan_su n on n.id_nhan_vien=s.id_nhan_vien
+        where ${filters.join(" and ")}
+      ) select * from filtered order by thang_nam desc,ten_khach_hang,ten_san_pham limit $${params.length - 1} offset $${params.length}`;
+      const rows = (await getPool().query(sql, params)).rows;
+      return json(200, {
+        items: rows.map((r) => ({ period: r.thang_nam, customerId: r.id_khach_hang, customerName: r.ten_khach_hang, productId: r.id_san_pham, productName: r.ten_san_pham, employeeId: r.id_nhan_vien, employeeName: r.ten_nhan_vien, amount: Number(r.amount), source: r.source })),
+        total: rows[0]?.total || 0, page, pageSize
+      });
+    }
+    if (event.httpMethod !== "POST") return methodNotAllowed();
     const body = parseBody(event);
     const amount = Number(body.amount);
     if (!/^\d{4}-\d{2}$/.test(body.period || "") || !body.customerId || !body.productId || !Number.isFinite(amount) || amount < 0) {

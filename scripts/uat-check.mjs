@@ -38,6 +38,7 @@ check("UAT-AUTO-01", "Netlify build config publishes dist and uses Node 22", () 
 check("UAT-AUTO-02", "Public API routes are mapped to Netlify functions", () => {
   const toml = read("netlify.toml");
   const routes = [
+    "dashboard",
     "bootstrap-data",
     "login",
     "logout",
@@ -147,6 +148,7 @@ check("UAT-AUTO-08", "Data import templates are ready for real data", () => {
 
 check("UAT-AUTO-09", "Netlify functions can be loaded by Node", () => {
   const functions = [
+    "dashboard",
     "bootstrap-data",
     "login",
     "logout",

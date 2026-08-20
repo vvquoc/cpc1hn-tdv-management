@@ -58,7 +58,10 @@
         <section id="dashboard" class="section">
           <div class="section-heading">
             <h2>Tổng quan</h2>
-            <span id="scopeLabel"></span>
+            <div class="reporting-controls">
+              <label>Kỳ báo cáo<select id="reportingPeriod"></select></label>
+              <span id="scopeLabel"></span>
+            </div>
           </div>
           <div class="metrics">
             <article>
@@ -106,6 +109,7 @@
               <tbody id="prescriptionRows"></tbody>
             </table>
           </div>
+          <div id="prescriptionPagination" class="pagination"></div>
         </section>
 
         <section id="sales" class="section">
@@ -132,6 +136,7 @@
               <tbody id="salesRows"></tbody>
             </table>
           </div>
+          <div id="salesPagination" class="pagination"></div>
         </section>
 
         <section id="tender" class="section">
@@ -170,15 +175,25 @@
               <tbody id="tenderRows"></tbody>
             </table>
           </div>
+          <div id="tenderPagination" class="pagination"></div>
         </section>
 
         <section id="admin" class="section" data-admin-only>
           <div class="section-heading">
             <h2>Quản trị dữ liệu</h2>
-            <span>Quản lý thêm, sửa, xóa và import/export dữ liệu thật ngay trên website.</span>
+            <span id="accountSummary"></span>
           </div>
 
-          <div class="data-transfer">
+          <div class="admin-tabs" role="tablist" aria-label="Nhóm dữ liệu quản trị">
+            <button type="button" class="tab-button active" data-admin-tab="employee">Tài khoản</button>
+            <button type="button" class="tab-button" data-admin-tab="customer">Khách hàng</button>
+            <button type="button" class="tab-button" data-admin-tab="product">Sản phẩm</button>
+            <button type="button" class="tab-button" data-admin-tab="territory">Địa bàn</button>
+            <button type="button" class="tab-button" data-admin-tab="assignment">Phân quyền</button>
+            <button type="button" class="tab-button" data-admin-tab="import">Import / Export</button>
+          </div>
+
+          <div class="data-transfer" data-admin-panel="import" hidden>
             <div>
               <h3>Import / Export</h3>
               <p>Tải file mẫu, điền dữ liệu thật, rồi import theo từng nhóm dữ liệu.</p>
@@ -211,7 +226,7 @@
           </div>
 
           <div class="admin-grid">
-            <form id="employeeForm" class="admin-form">
+            <form id="employeeForm" class="admin-form" data-admin-panel="employee">
               <div class="form-title">
                 <h3>Nhân sự / tài khoản</h3>
                 <button class="secondary-button" type="reset">Mới</button>
@@ -236,7 +251,7 @@
               <button type="submit">Lưu nhân sự</button>
             </form>
 
-            <form id="territoryForm" class="admin-form">
+            <form id="territoryForm" class="admin-form" data-admin-panel="territory" hidden>
               <div class="form-title">
                 <h3>Địa bàn</h3>
                 <button class="secondary-button" type="reset">Mới</button>
@@ -253,7 +268,7 @@
               <button type="submit">Lưu địa bàn</button>
             </form>
 
-            <form id="productForm" class="admin-form">
+            <form id="productForm" class="admin-form" data-admin-panel="product" hidden>
               <div class="form-title">
                 <h3>Sản phẩm</h3>
                 <button class="secondary-button" type="reset">Mới</button>
@@ -282,7 +297,7 @@
               <button type="submit">Lưu sản phẩm</button>
             </form>
 
-            <form id="customerForm" class="admin-form">
+            <form id="customerForm" class="admin-form" data-admin-panel="customer" hidden>
               <div class="form-title">
                 <h3>Khách hàng</h3>
                 <button class="secondary-button" type="reset">Mới</button>
@@ -308,7 +323,7 @@
               <button type="submit">Lưu khách hàng</button>
             </form>
 
-            <form id="territoryAssignForm" class="admin-form">
+            <form id="territoryAssignForm" class="admin-form" data-admin-panel="assignment" hidden>
               <h3>Phân địa bàn</h3>
               <label>Nhân sự<select name="employeeId" required></select></label>
               <label>Địa bàn<select name="territoryId" required></select></label>
@@ -316,7 +331,7 @@
               <button type="submit">Gán địa bàn</button>
             </form>
 
-            <form id="customerAssignForm" class="admin-form">
+            <form id="customerAssignForm" class="admin-form" data-admin-panel="assignment" hidden>
               <h3>Phân khách hàng</h3>
               <label>Nhân sự<select name="employeeId" required></select></label>
               <label>Khách hàng<select name="customerId" required></select></label>
@@ -325,27 +340,35 @@
           </div>
 
           <div class="admin-lists">
-            <div>
+            <div data-admin-panel="employee">
               <h3>Nhân sự hiện có</h3>
+              <input class="admin-search" data-admin-search="employee" type="search" placeholder="Tìm tên, mã hoặc tài khoản" />
               <ul id="employeeAdminList" class="list"></ul>
+              <div id="employeeAdminPagination" class="pagination"></div>
             </div>
-            <div>
+            <div data-admin-panel="product" hidden>
               <h3>Sản phẩm hiện có</h3>
+              <input class="admin-search" data-admin-search="product" type="search" placeholder="Tìm sản phẩm" />
               <ul id="productAdminList" class="list"></ul>
+              <div id="productAdminPagination" class="pagination"></div>
             </div>
-            <div>
+            <div data-admin-panel="customer" hidden>
               <h3>Khách hàng hiện có</h3>
+              <input class="admin-search" data-admin-search="customer" type="search" placeholder="Tìm khách hàng" />
               <ul id="customerAdminList" class="list"></ul>
+              <div id="customerAdminPagination" class="pagination"></div>
             </div>
-            <div>
+            <div data-admin-panel="territory" hidden>
               <h3>Địa bàn hiện có</h3>
+              <input class="admin-search" data-admin-search="territory" type="search" placeholder="Tìm địa bàn" />
               <ul id="territoryAdminList" class="list"></ul>
+              <div id="territoryAdminPagination" class="pagination"></div>
             </div>
-            <div>
+            <div data-admin-panel="assignment" hidden>
               <h3>Phân địa bàn hiện có</h3>
               <ul id="territoryAssignmentList" class="list"></ul>
             </div>
-            <div>
+            <div data-admin-panel="assignment" hidden>
               <h3>Phân khách hàng hiện có</h3>
               <ul id="customerAssignmentList" class="list"></ul>
             </div>

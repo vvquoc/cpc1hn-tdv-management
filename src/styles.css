@@ -193,6 +193,18 @@ label {
   margin-bottom: 16px;
 }
 
+.reporting-controls {
+  display: flex;
+  gap: 14px;
+  align-items: end;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.reporting-controls label {
+  min-width: 150px;
+}
+
 .metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -264,6 +276,29 @@ button:hover {
   border-radius: 8px;
 }
 
+.table-wrap tbody tr {
+  height: 48px;
+}
+
+.pagination {
+  min-height: 38px;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.pagination button {
+  min-width: 38px;
+  padding: 7px 10px;
+}
+
+.pagination button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -332,6 +367,35 @@ tr:last-child td {
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 14px;
   align-items: start;
+}
+
+.admin-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 16px;
+}
+
+.tab-button {
+  flex: 0 0 auto;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+}
+
+.tab-button:hover,
+.tab-button.active {
+  background: #eef7f6;
+  color: var(--accent-dark);
+  border-bottom-color: var(--accent);
+}
+
+.admin-search {
+  width: 100%;
+  margin-bottom: 10px;
 }
 
 .data-transfer {
@@ -421,7 +485,7 @@ tr:last-child td {
   }
 
   nav {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .topbar,
@@ -437,6 +501,10 @@ tr:last-child td {
   }
 
   .account-box {
+    justify-content: flex-start;
+  }
+
+  .reporting-controls {
     justify-content: flex-start;
   }
 }

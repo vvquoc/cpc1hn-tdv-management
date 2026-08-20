@@ -199,10 +199,17 @@ exports.handler = async (event) => {
           values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
           on conflict (source_spreadsheet_id,source_sheet_id,source_row_number) do update set import_batch_id=excluded.import_batch_id,row_hash=excluded.row_hash,ten_quan_ly=excluded.ten_quan_ly,ma_nhan_vien=excluded.ma_nhan_vien,ten_nhan_vien=excluded.ten_nhan_vien,tinh=excluded.tinh,nhom_khach_hang=excluded.nhom_khach_hang,thang=excluded.thang,nam=excluded.nam,ma_khach_hang=excluded.ma_khach_hang,ten_khach_hang=excluded.ten_khach_hang,ngay_chung_tu=excluded.ngay_chung_tu,so_chung_tu_ngoai=excluded.so_chung_tu_ngoai,ma_hang_hoa=excluded.ma_hang_hoa,ten_hang_hoa=excluded.ten_hang_hoa,don_vi_tinh=excluded.don_vi_tinh,so_luong=excluded.so_luong,don_gia=excluded.don_gia,doanh_thu=excluded.doanh_thu,he_so=excluded.he_so,doanh_so=excluded.doanh_so,id_nhan_vien=excluded.id_nhan_vien,id_khach_hang=excluded.id_khach_hang,id_san_pham=excluded.id_san_pham,updated_at=now()`, [batchId,SOURCE_SPREADSHEET_ID,SOURCE_SHEET_ID,startRow+index,row.rowHash,row.managerName,row.employeeCode,row.employeeName,row.province,row.customerGroup,row.month,row.year,row.customerCode,row.customerName,row.documentDate,row.externalDocument,row.productCode,row.productName,row.unit,row.quantity,row.unitPrice,row.revenue,row.coefficient,row.sales,ids.employeeId,ids.customerId,ids.productId]);
       }
+      let deleted = 0;
+      if (body.final) {
+        const cleanup = await client.query(`delete from data_sale_transactions
+          where source_spreadsheet_id=$1 and source_sheet_id=$2 and import_batch_id<>$3`,
+        [SOURCE_SPREADSHEET_ID, SOURCE_SHEET_ID, batchId]);
+        deleted = cleanup.rowCount;
+      }
       await client.query("update data_sale_import_batches set row_count=row_count+$2, status=case when $3 then 'Completed' else status end, finished_at=case when $3 then now() else finished_at end where id=$1", [batchId,rows.length,Boolean(body.final)]);
       await client.query("update app_state_revision set revision=revision+1,updated_at=now() where id=1");
       await client.query("commit");
-      return json(200, { batchId, imported: rows.length, nextRow: startRow + rows.length, completed: Boolean(body.final) });
+      return json(200, { batchId, imported: rows.length, deleted, nextRow: startRow + rows.length, completed: Boolean(body.final) });
     } catch (error) {
       await client.query("rollback");
       throw error;

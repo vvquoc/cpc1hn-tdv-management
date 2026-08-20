@@ -20,6 +20,11 @@
   NODE_VERSION = "22"
 
 [[redirects]]
+  from = "/api/v1/dashboard"
+  to = "/.netlify/functions/dashboard"
+  status = 200
+
+[[redirects]]
   from = "/api/v1/bootstrap-data"
   to = "/.netlify/functions/bootstrap-data"
   status = 200
