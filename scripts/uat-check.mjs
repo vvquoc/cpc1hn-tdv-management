@@ -54,6 +54,7 @@ check("UAT-AUTO-02", "Public API routes are mapped to Netlify functions", () => 
   for (const route of routes) {
     assert(toml.includes(`/api/v1/${route}`), `Missing API route ${route}`);
     assert(exists(`netlify/functions/${route}.js`), `Missing function ${route}.js`);
+    assert(exists(`netlify/functions-v2/${route}.mjs`), `Missing modern function wrapper ${route}.mjs`);
   }
 });
 
@@ -173,6 +174,7 @@ check("UAT-AUTO-11", "Operational store uses PostgreSQL and optimistic concurren
   const database = read("netlify/functions/shared/db.js");
   const store = read("netlify/functions/shared/store.js");
   assert(database.includes("CPC1_DATABASE_URL"), "Missing production Lambda database override");
+  assert(read("netlify.toml").includes('directory = "netlify/functions-v2"'), "Netlify must use modern Functions runtime");
   assert(store.includes('require("./db")'), "Operational store must use the shared PostgreSQL connection");
   assert(store.includes("app_state_revision"), "Missing persisted revision check");
   assert(store.includes("for update"), "Missing concurrency lock");

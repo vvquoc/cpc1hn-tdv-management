@@ -25,7 +25,7 @@ Nhánh kiểm thử: `codex/backend-qa-hardening`
 | High | Lưu xong chưa thấy dữ liệu cập nhật | Netlify Blobs dùng một JSON chung và có thể đọc dữ liệu cũ | Chuyển toàn bộ dữ liệu nghiệp vụ sang PostgreSQL |
 | High | Hai người lưu cùng lúc có thể ghi đè dữ liệu | Không có transaction hoặc kiểm tra phiên bản | Thêm transaction, khóa revision và lỗi xung đột `409` |
 | High | DATA SALE 35.123 dòng chưa có mô hình chi tiết | Schema cũ chỉ lưu doanh số tổng hợp thủ công | Thêm bảng 19 cột nguồn, batch import, view tháng và upsert idempotent |
-| High | Lambda/CJS không tự nhận Netlify Database URL | Runtime API v1 không được Netlify tự inject DB URL | Dùng secret production `CPC1_DATABASE_URL`, không lưu credential trong GitHub |
+| High | Lambda/CJS không tự nhận Netlify Database URL | Runtime API v1 không được Netlify tự inject DB URL; URL lấy từ CLI chỉ có quyền đọc | Bọc backend bằng Netlify Functions v2 để runtime tự cấp kết nối ghi; URL thủ công chỉ là fallback development |
 | High | Một request đọc store nhiều lần | `requireUser` và handler cùng tải toàn bộ dữ liệu | Tái sử dụng cùng snapshot dữ liệu trong request |
 | High | Có thể ghi đè gói thầu ngoài phạm vi | Chỉ kiểm tra khách hàng mới, không kiểm tra bản ghi thầu hiện hữu | Kiểm tra quyền trên cả bản ghi cũ và dữ liệu mới |
 | High | Sửa tài khoản có thể làm lệch credential | Form không tải username hiện tại và có nguy cơ giữ dữ liệu autofill | Trả danh sách username an toàn, xóa ô mật khẩu khi mở form sửa |

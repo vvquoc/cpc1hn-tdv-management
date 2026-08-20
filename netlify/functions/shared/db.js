@@ -5,7 +5,12 @@ let cachedPool;
 function getPool() {
   if (!cachedPool) {
     const connectionString = process.env.CPC1_DATABASE_URL || process.env.NETLIFY_DB_URL || process.env.DATABASE_URL;
-    cachedPool = (connectionString ? getDatabase({ connectionString }) : getDatabase()).pool;
+    try {
+      cachedPool = getDatabase().pool;
+    } catch (error) {
+      if (!connectionString || error.name !== "MissingDatabaseConnectionError") throw error;
+      cachedPool = getDatabase({ connectionString }).pool;
+    }
   }
   return cachedPool;
 }
