@@ -1,3 +1,5 @@
+create extension if not exists pgcrypto;
+
 create type employee_role as enum ('MR', 'Supervisor', 'Manager', 'Admin');
 create type employee_status as enum ('Active', 'Inactive');
 create type customer_type as enum ('BenhVien', 'SoYTe', 'PhongMachTu');

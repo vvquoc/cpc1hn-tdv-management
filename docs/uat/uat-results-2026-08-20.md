@@ -9,7 +9,7 @@ Nhánh kiểm thử: `codex/backend-qa-hardening`
 | Nhóm | Kết quả | Ghi chú |
 | --- | --- | --- |
 | Build ứng dụng | PASS | Sinh `dist/` thành công |
-| Netlify production build | PASS | Áp 7 migration, đóng gói đủ 12 Functions |
+| Netlify production build | PASS | Đóng gói đủ 12 Functions; migration 008 sửa credential quản lý |
 | Kiểm tra cấu hình/UI | PASS 13/13 | Route, form, PostgreSQL, import template và CRUD |
 | Kiểm tra backend cô lập | PASS 18/18 | Auth, role, scope, CRUD và validation |
 | Kiểm tra database tích hợp | PASS | Đăng nhập `15795`, đọc PostgreSQL và import DATA SALE idempotent |
@@ -81,6 +81,6 @@ Cả ba lệnh đều PASS trên workspace ngày 2026-08-20.
 
 ## 6. Rủi ro còn lại
 
-1. Chưa deploy nhánh hiện tại nên production vẫn đang chạy bản cũ.
+1. Deploy `1c472e3` bị Netlify chặn do migration 001 đã áp bị thay đổi; bản sửa khôi phục 001 và chuyển thay đổi sang migration 008 mới.
 2. Chưa nhập toàn bộ 35.123 dòng DATA SALE vào production; hiện mới xác minh dòng mẫu trên database development.
 3. Sau deploy cần chạy lại toàn bộ PROD-01 đến PROD-08 trên URL thật.
