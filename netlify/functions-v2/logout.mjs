@@ -1,4 +1,4 @@
-import legacy from "../functions/logout.js";
 import { adapt } from "./shared/adapter.mjs";
+const legacy = await import("../functions/logout.js");
 
-export default adapt(legacy.handler);
+export default adapt(legacy.default.handler);

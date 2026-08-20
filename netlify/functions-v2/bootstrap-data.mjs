@@ -1,4 +1,4 @@
-import legacy from "../functions/bootstrap-data.js";
 import { adapt } from "./shared/adapter.mjs";
+const legacy = await import("../functions/bootstrap-data.js");
 
-export default adapt(legacy.handler);
+export default adapt(legacy.default.handler);

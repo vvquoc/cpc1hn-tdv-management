@@ -175,6 +175,7 @@ check("UAT-AUTO-11", "Operational store uses PostgreSQL and optimistic concurren
   const store = read("netlify/functions/shared/store.js");
   assert(database.includes("CPC1_DATABASE_URL"), "Missing production Lambda database override");
   assert(read("netlify.toml").includes('directory = "netlify/functions-v2"'), "Netlify must use modern Functions runtime");
+  assert(read("netlify/functions-v2/shared/adapter.mjs").includes('from "@netlify/database"'), "Functions v2 adapter must bundle the database runtime");
   assert(store.includes('require("./db")'), "Operational store must use the shared PostgreSQL connection");
   assert(store.includes("app_state_revision"), "Missing persisted revision check");
   assert(store.includes("for update"), "Missing concurrency lock");

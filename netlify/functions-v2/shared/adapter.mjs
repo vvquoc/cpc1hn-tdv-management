@@ -1,3 +1,7 @@
+import { getDatabase } from "@netlify/database";
+
+globalThis.__CPC1_GET_DATABASE__ = getDatabase;
+
 export function adapt(handler) {
   return async function netlifyFunction(request, context) {
     const url = new URL(request.url);

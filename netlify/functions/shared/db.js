@@ -1,4 +1,4 @@
-const { getDatabase } = require("@netlify/database");
+const getDatabase = globalThis.__CPC1_GET_DATABASE__ || require("@netlify/database").getDatabase;
 
 let cachedPool;
 
