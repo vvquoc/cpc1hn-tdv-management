@@ -170,7 +170,9 @@ check("UAT-AUTO-10", "Async forms keep stable form references before reset", () 
 });
 
 check("UAT-AUTO-11", "Operational store uses PostgreSQL and optimistic concurrency control", () => {
+  const database = read("netlify/functions/shared/db.js");
   const store = read("netlify/functions/shared/store.js");
+  assert(database.includes("CPC1_DATABASE_URL"), "Missing production Lambda database override");
   assert(store.includes('require("./db")'), "Operational store must use the shared PostgreSQL connection");
   assert(store.includes("app_state_revision"), "Missing persisted revision check");
   assert(store.includes("for update"), "Missing concurrency lock");

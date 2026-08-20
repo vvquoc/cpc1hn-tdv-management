@@ -4,7 +4,7 @@ let cachedPool;
 
 function getPool() {
   if (!cachedPool) {
-    const connectionString = process.env.NETLIFY_DB_URL || process.env.DATABASE_URL;
+    const connectionString = process.env.CPC1_DATABASE_URL || process.env.NETLIFY_DB_URL || process.env.DATABASE_URL;
     cachedPool = (connectionString ? getDatabase({ connectionString }) : getDatabase()).pool;
   }
   return cachedPool;
