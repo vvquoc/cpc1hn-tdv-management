@@ -14,10 +14,30 @@
   autoLaunch = false
 
 [context.production.environment]
-  NODE_VERSION = "20"
+  NODE_VERSION = "22"
 
 [context.deploy-preview.environment]
-  NODE_VERSION = "20"
+  NODE_VERSION = "22"
+
+[[redirects]]
+  from = "/api/v1/bootstrap-data"
+  to = "/.netlify/functions/bootstrap-data"
+  status = 200
+
+[[redirects]]
+  from = "/api/v1/prescriptions"
+  to = "/.netlify/functions/prescriptions"
+  status = 200
+
+[[redirects]]
+  from = "/api/v1/sales"
+  to = "/.netlify/functions/sales"
+  status = 200
+
+[[redirects]]
+  from = "/api/v1/tenders"
+  to = "/.netlify/functions/tenders"
+  status = 200
 
 [[redirects]]
   from = "/api/v1/lost-sales-trigger"

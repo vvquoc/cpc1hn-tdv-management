@@ -1,4 +1,4 @@
-const STORAGE_KEY = "cpc1hn-tdv-mvp-state";
+const STORAGE_EMAIL_KEY = "cpc1hn-tdv-active-email";
 const currency = new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 });
 
 const statusLabel = {
@@ -8,39 +8,37 @@ const statusLabel = {
   TruotThau: "Trượt thầu"
 };
 
-function loadState() {
-  const saved = localStorage.getItem(STORAGE_KEY);
-  return saved ? JSON.parse(saved) : structuredClone(window.CPC1_SEED);
+const demoUsers = window.CPC1_SEED.employees;
+let state = structuredClone(window.CPC1_SEED);
+let apiReady = false;
+
+function activeEmail() {
+  return document.querySelector("#activeUser").value;
 }
 
-function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+function activeEmployee() {
+  return state.employees.find((item) => item.email === activeEmail()) || state.activeUser || state.employees[0];
+}
+
+async function api(path, options = {}) {
+  const response = await fetch(path, {
+    ...options,
+    headers: {
+      "content-type": "application/json",
+      "x-user-email": activeEmail(),
+      ...(options.headers || {})
+    }
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || "API request failed");
+  }
+  return payload;
 }
 
 function byId(collection, id) {
   return collection.find((item) => item.id === id);
-}
-
-function activeEmployee() {
-  return byId(state.employees, document.querySelector("#activeUser").value);
-}
-
-function scopeCustomers(employee) {
-  if (employee.role === "Admin" || employee.role === "Manager") return state.customers;
-  if (employee.role === "Supervisor") {
-    return state.customers.filter((customer) => employee.territoryIds.includes(customer.territoryId));
-  }
-  return state.customers.filter((customer) => customer.ownerId === employee.id);
-}
-
-function scopeEmployeeIds(employee) {
-  if (employee.role === "Admin" || employee.role === "Manager") return state.employees.map((item) => item.id);
-  if (employee.role === "Supervisor") {
-    return state.employees
-      .filter((item) => item.territoryIds.some((territoryId) => employee.territoryIds.includes(territoryId)))
-      .map((item) => item.id);
-  }
-  return [employee.id];
 }
 
 function latestPeriods(count) {
@@ -64,20 +62,45 @@ function computeLostSales(customers) {
 }
 
 function setOptions(select, items, labelFor) {
-  select.innerHTML = items.map((item) => `<option value="${item.id}">${labelFor(item)}</option>`).join("");
+  select.innerHTML = items.map((item) => `<option value="${item.id || item.email}">${labelFor(item)}</option>`).join("");
+}
+
+function showNotice(message) {
+  let notice = document.querySelector("#notice");
+  if (!notice) {
+    notice = document.createElement("div");
+    notice.id = "notice";
+    notice.className = "notice";
+    document.querySelector("main").prepend(notice);
+  }
+  notice.textContent = message;
+  notice.hidden = !message;
+}
+
+async function loadData() {
+  localStorage.setItem(STORAGE_EMAIL_KEY, activeEmail());
+  try {
+    const data = await api("/api/v1/bootstrap-data");
+    state = data;
+    apiReady = true;
+    showNotice("");
+  } catch (error) {
+    apiReady = false;
+    showNotice(`Chưa kết nối được database production: ${error.message}`);
+  }
+  render();
 }
 
 function render() {
   const employee = activeEmployee();
-  const customers = scopeCustomers(employee);
+  const customers = state.customers || [];
   const customerIds = customers.map((item) => item.id);
-  const employeeIds = scopeEmployeeIds(employee);
-  const prescriptions = state.prescriptions.filter((item) => customerIds.includes(item.customerId));
-  const sales = state.sales.filter((item) => customerIds.includes(item.customerId));
-  const tenders = state.tenders.filter((item) => customerIds.includes(item.customerId));
+  const prescriptions = (state.prescriptions || []).filter((item) => customerIds.includes(item.customerId));
+  const sales = (state.sales || []).filter((item) => customerIds.includes(item.customerId));
+  const tenders = (state.tenders || []).filter((item) => customerIds.includes(item.customerId));
   const lostSales = computeLostSales(customers);
 
-  document.querySelector("#scopeLabel").textContent = `${employee.name} · ${employee.role} · ${employee.territoryIds.join(", ")}`;
+  document.querySelector("#scopeLabel").textContent = `${employee.name} · ${employee.role} · ${(employee.territoryIds || []).join(", ")}`;
   document.querySelector("#metricSales").textContent = currency.format(
     sales.filter((sale) => sale.period === "2026-08").reduce((sum, sale) => sum + Number(sale.amount), 0)
   );
@@ -89,17 +112,18 @@ function render() {
     setOptions(select, customers, (customer) => customer.name);
   });
   document.querySelectorAll("select[name='productId']").forEach((select) => {
-    setOptions(select, state.products, (product) => `${product.name} · ${product.dosageForm}`);
+    setOptions(select, state.products || [], (product) => `${product.name} · ${product.dosageForm}`);
   });
 
   document.querySelector("#prescriptionRows").innerHTML = prescriptions
     .slice()
     .reverse()
     .map((item) => {
-      const customer = byId(state.customers, item.customerId);
-      const product = byId(state.products, item.productId);
-      const owner = byId(state.employees, item.employeeId);
-      return `<tr><td>${item.date}</td><td>${owner.name}</td><td>${customer.name}</td><td>${product.name}</td><td>${item.quantity}</td><td>${currency.format(item.quantity * product.prescriptionPrice)}</td></tr>`;
+      const customer = byId(state.customers, item.customerId) || {};
+      const product = byId(state.products, item.productId) || {};
+      const owner = byId(state.employees, item.employeeId) || {};
+      const amount = item.amount || Number(item.quantity) * Number(product.prescriptionPrice || 0);
+      return `<tr><td>${item.date}</td><td>${owner.name || item.employeeId}</td><td>${customer.name || item.customerId}</td><td>${product.name || item.productId}</td><td>${item.quantity}</td><td>${currency.format(amount)}</td></tr>`;
     })
     .join("");
 
@@ -107,70 +131,101 @@ function render() {
     .slice()
     .reverse()
     .map((item) => {
-      const customer = byId(state.customers, item.customerId);
-      const product = byId(state.products, item.productId);
-      return `<tr><td>${item.period}</td><td>${customer.name}</td><td>${product.name}</td><td>${currency.format(item.amount)}</td></tr>`;
+      const customer = byId(state.customers, item.customerId) || {};
+      const product = byId(state.products, item.productId) || {};
+      return `<tr><td>${item.period}</td><td>${customer.name || item.customerId}</td><td>${product.name || item.productId}</td><td>${currency.format(item.amount)}</td></tr>`;
     })
     .join("");
 
   document.querySelector("#tenderRows").innerHTML = tenders
     .map((item) => {
-      const customer = byId(state.customers, item.customerId);
-      const product = byId(state.products, item.productId);
-      const owner = byId(state.employees, item.employeeId);
+      const customer = byId(state.customers, item.customerId) || {};
+      const product = byId(state.products, item.productId) || {};
+      const owner = byId(state.employees, item.employeeId) || {};
       const statusClass = item.status === "DangLamHoSo" ? "status-warn" : item.status === "TrungThau" ? "status-win" : "";
-      return `<tr><td>${item.id}</td><td>${customer.name}</td><td>${product.name}</td><td><span class="status ${statusClass}">${statusLabel[item.status]}</span></td><td>${item.dueDate}</td><td>${owner.name}</td></tr>`;
+      return `<tr><td>${item.id}</td><td>${customer.name || item.customerId}</td><td>${product.name || item.productId}</td><td><span class="status ${statusClass}">${statusLabel[item.status] || item.status}</span></td><td>${item.dueDate || ""}</td><td>${owner.name || item.employeeId}</td></tr>`;
     })
     .join("");
 
+  renderAlerts(lostSales, []);
+}
+
+function renderAlerts(lostSales, reminders) {
   document.querySelector("#lostSaleList").innerHTML = lostSales.length
-    ? lostSales.map((customer) => `<li><strong>${customer.name}</strong><br />Không phát sinh doanh số trong 4 tháng gần nhất.</li>`).join("")
+    ? lostSales.map((customer) => `<li><strong>${customer.name || customer.customerName}</strong><br />Không phát sinh doanh số trong 4 tháng gần nhất.</li>`).join("")
     : "<li>Không có cảnh báo trong phạm vi hiện tại.</li>";
 
   const today = "2026-08-20";
-  const missingReports = state.employees.filter((item) => employeeIds.includes(item.id) && item.role === "MR" && !state.dailyReports.some((report) => report.employeeId === item.id && report.date === today));
-  document.querySelector("#reminderList").innerHTML = missingReports.length
-    ? missingReports.map((item) => `<li><strong>${item.name}</strong><br />Chưa có báo cáo ngày ${today}.</li>`).join("")
+  const fallbackReminders = reminders.length
+    ? reminders
+    : (state.employees || []).filter((item) => item.role === "MR" && !(state.dailyReports || []).some((report) => report.employeeId === item.id && report.date === today));
+
+  document.querySelector("#reminderList").innerHTML = fallbackReminders.length
+    ? fallbackReminders.map((item) => `<li><strong>${item.employeeName || item.name}</strong><br />${item.message || `Chưa có báo cáo ngày ${today}.`}</li>`).join("")
     : "<li>Tất cả TDV trong phạm vi đã báo cáo hôm nay.</li>";
 }
 
 function bindForms() {
-  document.querySelector("#prescriptionForm").addEventListener("submit", (event) => {
+  document.querySelector("#prescriptionForm").addEventListener("submit", async (event) => {
     event.preventDefault();
-    const employee = activeEmployee();
+    if (!apiReady) return showNotice("Database chưa sẵn sàng, chưa thể ghi kê đơn.");
+
     const form = new FormData(event.currentTarget);
-    state.prescriptions.push({
-      date: form.get("date"),
-      employeeId: employee.id,
-      customerId: form.get("customerId"),
-      productId: form.get("productId"),
-      quantity: Number(form.get("quantity"))
-    });
-    saveState();
-    render();
-    event.currentTarget.reset();
-    setDefaultDates();
+    try {
+      await api("/api/v1/prescriptions", {
+        method: "POST",
+        body: JSON.stringify({
+          date: form.get("date"),
+          customerId: form.get("customerId"),
+          productId: form.get("productId"),
+          quantity: Number(form.get("quantity"))
+        })
+      });
+      event.currentTarget.reset();
+      setDefaultDates();
+      await loadData();
+    } catch (error) {
+      showNotice(error.message);
+    }
   });
 
-  document.querySelector("#salesForm").addEventListener("submit", (event) => {
+  document.querySelector("#salesForm").addEventListener("submit", async (event) => {
     event.preventDefault();
-    const employee = activeEmployee();
+    if (!apiReady) return showNotice("Database chưa sẵn sàng, chưa thể ghi doanh số.");
+
     const form = new FormData(event.currentTarget);
-    state.sales.push({
-      period: form.get("period"),
-      employeeId: employee.id,
-      customerId: form.get("customerId"),
-      productId: form.get("productId"),
-      amount: Number(form.get("amount"))
-    });
-    saveState();
-    render();
-    event.currentTarget.reset();
-    setDefaultDates();
+    try {
+      await api("/api/v1/sales", {
+        method: "POST",
+        body: JSON.stringify({
+          period: form.get("period"),
+          customerId: form.get("customerId"),
+          productId: form.get("productId"),
+          amount: Number(form.get("amount"))
+        })
+      });
+      event.currentTarget.reset();
+      setDefaultDates();
+      await loadData();
+    } catch (error) {
+      showNotice(error.message);
+    }
   });
 
-  document.querySelector("#activeUser").addEventListener("change", render);
-  document.querySelector("#runLostSale").addEventListener("click", render);
+  document.querySelector("#activeUser").addEventListener("change", loadData);
+  document.querySelector("#runLostSale").addEventListener("click", async () => {
+    if (!apiReady) return renderAlerts(computeLostSales(state.customers || []), []);
+
+    try {
+      const [lostSaleData, reminderData] = await Promise.all([
+        api("/api/v1/lost-sales-trigger"),
+        api("/api/v1/daily-reminders")
+      ]);
+      renderAlerts(lostSaleData.alerts || [], reminderData.reminders || []);
+    } catch (error) {
+      showNotice(error.message);
+    }
+  });
 }
 
 function setDefaultDates() {
@@ -178,8 +233,13 @@ function setDefaultDates() {
   document.querySelector("input[name='period']").value = "2026-08";
 }
 
-const state = loadState();
-setOptions(document.querySelector("#activeUser"), state.employees, (employee) => `${employee.name} · ${employee.role}`);
+function initUsers() {
+  const savedEmail = localStorage.getItem(STORAGE_EMAIL_KEY) || demoUsers[0].email;
+  setOptions(document.querySelector("#activeUser"), demoUsers, (employee) => `${employee.name} · ${employee.role}`);
+  document.querySelector("#activeUser").value = savedEmail;
+}
+
+initUsers();
 setDefaultDates();
 bindForms();
-render();
+loadData();

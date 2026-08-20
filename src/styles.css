@@ -141,6 +141,15 @@ label {
   padding: 18px;
 }
 
+.notice {
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #92400e;
+  padding: 12px 14px;
+  font-size: 14px;
+}
+
 .section-heading {
   display: flex;
   justify-content: space-between;
