@@ -12,6 +12,21 @@ const demoUsers = window.CPC1_SEED.employees;
 let state = structuredClone(window.CPC1_SEED);
 let apiReady = false;
 
+function currentDate() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function currentPeriod() {
+  return currentDate().slice(0, 7);
+}
+
 function activeEmail() {
   return document.querySelector("#activeUser").value;
 }
@@ -118,7 +133,7 @@ function render() {
 
   document.querySelector("#scopeLabel").textContent = `${employee.name} · ${employee.role} · ${(employee.territoryIds || []).join(", ")}`;
   document.querySelector("#metricSales").textContent = currency.format(
-    sales.filter((sale) => sale.period === "2026-08").reduce((sum, sale) => sum + Number(sale.amount), 0)
+    sales.filter((sale) => sale.period === currentPeriod()).reduce((sum, sale) => sum + Number(sale.amount), 0)
   );
   document.querySelector("#metricRx").textContent = prescriptions.reduce((sum, item) => sum + Number(item.quantity), 0);
   document.querySelector("#metricTenders").textContent = tenders.filter((item) => item.status !== "TrungThau" && item.status !== "TruotThau").length;
@@ -172,7 +187,7 @@ function renderAlerts(lostSales, reminders) {
     ? lostSales.map((customer) => `<li><strong>${customer.name || customer.customerName}</strong><br />Không phát sinh doanh số trong 4 tháng gần nhất.</li>`).join("")
     : "<li>Không có cảnh báo trong phạm vi hiện tại.</li>";
 
-  const today = "2026-08-20";
+  const today = currentDate();
   const fallbackReminders = reminders.length
     ? reminders
     : (state.employees || []).filter((item) => item.role === "MR" && !(state.dailyReports || []).some((report) => report.employeeId === item.id && report.date === today));
@@ -438,8 +453,8 @@ function bindForms() {
 }
 
 function setDefaultDates() {
-  document.querySelector("input[name='date']").value = "2026-08-20";
-  document.querySelector("input[name='period']").value = "2026-08";
+  document.querySelector("input[name='date']").value = currentDate();
+  document.querySelector("input[name='period']").value = currentPeriod();
 }
 
 function initUsers() {

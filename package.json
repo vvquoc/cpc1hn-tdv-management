@@ -6,7 +6,8 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "dev": "npx netlify dev",
-    "check": "node scripts/build.mjs --check"
+    "check": "node scripts/build.mjs --check",
+    "uat": "node scripts/uat-check.mjs"
   },
   "engines": {
     "node": ">=22.12.0"
