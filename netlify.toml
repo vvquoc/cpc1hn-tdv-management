@@ -40,6 +40,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/v1/import/google-sheet"
+  to = "/.netlify/functions/import-google-sheet"
+  status = 200
+
+[[redirects]]
   from = "/api/v1/lost-sales-trigger"
   to = "/.netlify/functions/lost-sales-trigger"
   status = 200

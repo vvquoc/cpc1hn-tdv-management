@@ -9,3 +9,5 @@ yarn-error.log*
 pnpm-debug.log*
 dist/
 outputs/
+n8n/.env.local
+n8n/automation-secret.txt

@@ -1,0 +1,125 @@
+{
+  "name": "CPC1HN Google Sheets Sync",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "baseUrl",
+              "value": "https://cpc1hn-tdv-management.netlify.app"
+            },
+            {
+              "name": "table",
+              "value": "tb_doanh_thu"
+            }
+          ]
+        }
+      },
+      "name": "Set Sync Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": "1HUXh_XFKfuT5nbfvox_RX5OR2N9i0lM6aVSBA-PItWI",
+        "sheetName": "tb_doanh_thu",
+        "options": {}
+      },
+      "name": "Read Google Sheet Rows",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { table: $('Set Sync Config').first().json.table, rows: $input.all().map(item => item.json) } }];"
+      },
+      "name": "Pack Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Set Sync Config').first().json.baseUrl + '/api/v1/import/google-sheet' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-automation-secret",
+              "value": "={{ $env.N8N_AUTOMATION_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "name": "POST to Netlify Import API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1120, 300]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Sync Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Sync Config": {
+      "main": [
+        [
+          {
+            "node": "Read Google Sheet Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Google Sheet Rows": {
+      "main": [
+        [
+          {
+            "node": "Pack Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pack Rows": {
+      "main": [
+        [
+          {
+            "node": "POST to Netlify Import API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
