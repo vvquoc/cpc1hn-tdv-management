@@ -29,7 +29,7 @@ exports.handler = async (event) => {
        from tb_nhan_su ns
        join employee_customers ec on ec.id_nhan_vien = ns.id_nhan_vien
        join tb_khach_hang kh on kh.id_khach_hang = ec.id_khach_hang
-       where ns.chuc_vu = 'MR'
+       where ns.chuc_vu in ('NhanVien', 'MR', 'Supervisor')
          and ns.trang_thai = 'Active'
          and ${scope.clause}
          and not exists (

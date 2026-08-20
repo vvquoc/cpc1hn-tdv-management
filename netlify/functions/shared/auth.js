@@ -42,20 +42,12 @@ async function requireUser(event) {
 }
 
 function isAdmin(user) {
-  return user.chuc_vu === "Admin" || user.chuc_vu === "Manager";
+  return ["QuanLy", "Admin", "Manager"].includes(user.chuc_vu);
 }
 
 function customerScopeSql(user, alias = "kh", startIndex = 1) {
   if (isAdmin(user)) {
     return { clause: "true", params: [], nextIndex: startIndex };
-  }
-
-  if (user.chuc_vu === "Supervisor") {
-    return {
-      clause: `${alias}.id_dia_ban = any($${startIndex}::varchar[])`,
-      params: [user.territoryIds],
-      nextIndex: startIndex + 1
-    };
   }
 
   return {

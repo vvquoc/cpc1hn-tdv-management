@@ -1,8 +1,6 @@
 Enum employee_role {
-  MR
-  Supervisor
-  Manager
-  Admin
+  NhanVien
+  QuanLy
 }
 
 Enum customer_type {

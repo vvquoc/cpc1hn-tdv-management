@@ -12,6 +12,29 @@ const demoUsers = window.CPC1_SEED.employees;
 let state = structuredClone(window.CPC1_SEED);
 let apiReady = false;
 
+const roleLabel = {
+  NhanVien: "Nhân viên",
+  QuanLy: "Quản lý",
+  MR: "Nhân viên",
+  Supervisor: "Nhân viên",
+  Manager: "Quản lý",
+  Admin: "Quản lý"
+};
+
+const sampleCsvByResource = {
+  employees: "tb_nhan_su.csv",
+  territories: "tb_dia_ban.csv",
+  products: "tb_san_pham.csv",
+  customers: "tb_khach_hang.csv",
+  employeeTerritories: "employee_territories.csv",
+  employeeCustomers: "employee_customers.csv",
+  prescriptions: "tb_ke_don.csv",
+  sales: "tb_doanh_thu.csv",
+  tenders: "tb_thau.csv",
+  dailyReports: "daily_reports.csv",
+  kpiTargets: "kpi_targets.csv"
+};
+
 function currentDate() {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Ho_Chi_Minh",
@@ -37,7 +60,7 @@ function activeEmployee() {
 
 function canAdmin() {
   const employee = activeEmployee();
-  return employee && (employee.role === "Admin" || employee.role === "Manager");
+  return employee && ["QuanLy", "Admin", "Manager"].includes(employee.role);
 }
 
 async function api(path, options = {}) {
@@ -89,7 +112,7 @@ function setEmailOptions() {
   const select = document.querySelector("#activeUser");
   const current = select.value || localStorage.getItem(STORAGE_EMAIL_KEY) || demoUsers[0].email;
   const users = (state.employees && state.employees.length ? state.employees : demoUsers).filter((employee) => employee.status !== "Inactive");
-  select.innerHTML = users.map((employee) => `<option value="${employee.email}">${employee.name} · ${employee.role}</option>`).join("");
+  select.innerHTML = users.map((employee) => `<option value="${employee.email}">${employee.name} · ${roleLabel[employee.role] || employee.role}</option>`).join("");
   select.value = users.some((employee) => employee.email === current) ? current : users[0]?.email || "";
 }
 
@@ -111,6 +134,11 @@ async function loadData() {
     const data = await api("/api/v1/bootstrap-data");
     state = data;
     apiReady = true;
+    if (["QuanLy", "Admin", "Manager"].includes(state.activeUser?.role)) {
+      const assignments = await api("/api/v1/admin-data");
+      state.employeeTerritories = assignments.employeeTerritories || [];
+      state.employeeCustomers = assignments.employeeCustomers || [];
+    }
     showNotice("");
   } catch (error) {
     apiReady = false;
@@ -131,7 +159,7 @@ function render() {
   const tenders = (state.tenders || []).filter((item) => customerIds.includes(item.customerId));
   const lostSales = computeLostSales(customers);
 
-  document.querySelector("#scopeLabel").textContent = `${employee.name} · ${employee.role} · ${(employee.territoryIds || []).join(", ")}`;
+  document.querySelector("#scopeLabel").textContent = `${employee.name} · ${roleLabel[employee.role] || employee.role} · ${(employee.territoryIds || []).join(", ")}`;
   document.querySelector("#metricSales").textContent = currency.format(
     sales.filter((sale) => sale.period === currentPeriod()).reduce((sum, sale) => sum + Number(sale.amount), 0)
   );
@@ -190,7 +218,7 @@ function renderAlerts(lostSales, reminders) {
   const today = currentDate();
   const fallbackReminders = reminders.length
     ? reminders
-    : (state.employees || []).filter((item) => item.role === "MR" && !(state.dailyReports || []).some((report) => report.employeeId === item.id && report.date === today));
+    : (state.employees || []).filter((item) => ["NhanVien", "MR", "Supervisor"].includes(item.role) && !(state.dailyReports || []).some((report) => report.employeeId === item.id && report.date === today));
 
   document.querySelector("#reminderList").innerHTML = fallbackReminders.length
     ? fallbackReminders.map((item) => `<li><strong>${item.employeeName || item.name}</strong><br />${item.message || `Chưa có báo cáo ngày ${today}.`}</li>`).join("")
@@ -211,6 +239,52 @@ async function postAdmin(resource, data, action = "upsert") {
     body: JSON.stringify({ resource, action, data })
   });
   await loadData();
+}
+
+function downloadFile(fileName, content, type = "application/json") {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let field = "";
+  let quoted = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+    if (char === '"' && quoted && next === '"') {
+      field += '"';
+      index += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      row.push(field.trim());
+      field = "";
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && next === "\n") index += 1;
+      row.push(field.trim());
+      if (row.some((cell) => cell !== "")) rows.push(row);
+      row = [];
+      field = "";
+    } else {
+      field += char;
+    }
+  }
+
+  row.push(field.trim());
+  if (row.some((cell) => cell !== "")) rows.push(row);
+  const headers = rows.shift() || [];
+  return rows.map((cells) => Object.fromEntries(headers.map((header, index) => [header, cells[index] || ""])));
 }
 
 function fillForm(formId, data) {
@@ -239,7 +313,7 @@ function renderAdmin() {
   const customers = state.customers || [];
 
   document.querySelectorAll("#territoryAssignForm select[name='employeeId'], #customerAssignForm select[name='employeeId']").forEach((select) => {
-    setOptions(select, employees, (employee) => `${employee.name} · ${employee.role}`);
+    setOptions(select, employees, (employee) => `${employee.name} · ${roleLabel[employee.role] || employee.role}`);
   });
   document.querySelectorAll("#customerForm select[name='territoryId'], #territoryAssignForm select[name='territoryId']").forEach((select) => {
     setOptions(select, territories, (territory) => territory.name);
@@ -250,10 +324,10 @@ function renderAdmin() {
     .map((employee) => `
       <li>
         <strong>${employee.name}</strong><br />
-        ${employee.id} · ${employee.email} · ${employee.role} · ${employee.status || "Active"}
+        ${employee.id} · ${employee.email} · ${roleLabel[employee.role] || employee.role} · ${employee.status || "Active"}
         <div class="inline-actions">
           <button class="secondary-button" data-edit-employee="${employee.id}">Sửa</button>
-          <button class="danger-button" data-deactivate-employee="${employee.id}">Ngừng hoạt động</button>
+          <button class="danger-button" data-deactivate-employee="${employee.id}">Xóa</button>
         </div>
       </li>`)
     .join("");
@@ -265,7 +339,7 @@ function renderAdmin() {
         ${product.id} · ${product.dosageForm} · ${currency.format(product.prescriptionPrice || 0)} · ${product.status || "Active"}
         <div class="inline-actions">
           <button class="secondary-button" data-edit-product="${product.id}">Sửa</button>
-          <button class="danger-button" data-deactivate-product="${product.id}">Ngừng hoạt động</button>
+          <button class="danger-button" data-deactivate-product="${product.id}">Xóa</button>
         </div>
       </li>`)
     .join("");
@@ -277,10 +351,38 @@ function renderAdmin() {
         ${customer.id} · ${customer.type} · ${customer.territoryId} · ${customer.status || "Active"}
         <div class="inline-actions">
           <button class="secondary-button" data-edit-customer="${customer.id}">Sửa</button>
-          <button class="danger-button" data-deactivate-customer="${customer.id}">Ngừng hoạt động</button>
+          <button class="danger-button" data-deactivate-customer="${customer.id}">Xóa</button>
         </div>
       </li>`)
     .join("");
+
+  document.querySelector("#territoryAssignmentList").innerHTML = (state.employeeTerritories || [])
+    .map((assignment) => {
+      const employee = byId(employees, assignment.employeeId) || {};
+      const territory = byId(territories, assignment.territoryId) || {};
+      return `<li>
+        <strong>${employee.name || assignment.employeeId}</strong><br />
+        ${territory.name || assignment.territoryId}${assignment.isPrimary ? " · Địa bàn chính" : ""}
+        <div class="inline-actions">
+          <button class="danger-button" data-remove-territory="${assignment.employeeId}:${assignment.territoryId}">Xóa phân công</button>
+        </div>
+      </li>`;
+    })
+    .join("") || "<li>Chưa có phân công địa bàn.</li>";
+
+  document.querySelector("#customerAssignmentList").innerHTML = (state.employeeCustomers || [])
+    .map((assignment) => {
+      const employee = byId(employees, assignment.employeeId) || {};
+      const customer = byId(customers, assignment.customerId) || {};
+      return `<li>
+        <strong>${employee.name || assignment.employeeId}</strong><br />
+        ${customer.name || assignment.customerId}
+        <div class="inline-actions">
+          <button class="danger-button" data-remove-customer="${assignment.employeeId}:${assignment.customerId}">Xóa phân công</button>
+        </div>
+      </li>`;
+    })
+    .join("") || "<li>Chưa có phân công khách hàng.</li>";
 }
 
 function bindForms() {
@@ -413,6 +515,8 @@ function bindForms() {
     const employeeId = button.dataset.editEmployee || button.dataset.deactivateEmployee;
     const productId = button.dataset.editProduct || button.dataset.deactivateProduct;
     const customerId = button.dataset.editCustomer || button.dataset.deactivateCustomer;
+    const territoryAssignment = button.dataset.removeTerritory;
+    const customerAssignment = button.dataset.removeCustomer;
 
     try {
       if (button.dataset.editEmployee) {
@@ -430,7 +534,54 @@ function bindForms() {
         fillForm("#customerForm", customer);
       } else if (button.dataset.deactivateCustomer) {
         await postAdmin("customer", { id: customerId }, "deactivate");
+      } else if (territoryAssignment) {
+        const [employeeId, territoryId] = territoryAssignment.split(":");
+        await postAdmin("employee_territory", { employeeId, territoryId }, "remove");
+      } else if (customerAssignment) {
+        const [employeeId, customerId] = customerAssignment.split(":");
+        await postAdmin("employee_customer", { employeeId, customerId }, "remove");
       }
+    } catch (error) {
+      showNotice(error.message);
+    }
+  });
+
+  document.querySelector("#exportData").addEventListener("click", async () => {
+    if (!apiReady) return showNotice("Database chưa sẵn sàng, chưa thể export.");
+
+    try {
+      const payload = await api("/api/v1/data-transfer");
+      downloadFile(`cpc1hn-export-${currentDate()}.json`, JSON.stringify(payload, null, 2));
+    } catch (error) {
+      showNotice(error.message);
+    }
+  });
+
+  document.querySelector("#importForm select[name='resource']").addEventListener("change", (event) => {
+    const fileName = sampleCsvByResource[event.target.value] || "tb_nhan_su.csv";
+    const link = document.querySelector("#sampleCsvLink");
+    link.href = `./templates/csv/${fileName}`;
+    link.download = fileName;
+  });
+
+  document.querySelector("#importForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!apiReady) return showNotice("Database chưa sẵn sàng, chưa thể import.");
+
+    const form = event.currentTarget;
+    const resource = form.elements.resource.value;
+    const file = form.elements.file.files[0];
+    if (!file) return showNotice("Chưa chọn file CSV.");
+
+    try {
+      const rows = parseCsv(await file.text());
+      const result = await api("/api/v1/data-transfer", {
+        method: "POST",
+        body: JSON.stringify({ resource, rows })
+      });
+      showNotice(`Import xong ${result.imported || 0} dòng.`);
+      form.reset();
+      await loadData();
     } catch (error) {
       showNotice(error.message);
     }
@@ -459,7 +610,7 @@ function setDefaultDates() {
 
 function initUsers() {
   const savedEmail = localStorage.getItem(STORAGE_EMAIL_KEY) || demoUsers[0].email;
-  setOptions(document.querySelector("#activeUser"), demoUsers, (employee) => `${employee.name} · ${employee.role}`);
+  setOptions(document.querySelector("#activeUser"), demoUsers, (employee) => `${employee.name} · ${roleLabel[employee.role] || employee.role}`);
   document.querySelector("#activeUser").value = savedEmail;
 }
 

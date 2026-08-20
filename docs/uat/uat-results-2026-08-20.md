@@ -80,24 +80,24 @@ Kết quả:
 | ID | Kịch bản | Trạng thái hiện tại |
 | --- | --- | --- |
 | UAT-01 | Mở production URL sau đăng nhập Netlify | PENDING MANUAL |
-| UAT-02 | Admin thấy dashboard và menu Quản trị | PENDING MANUAL |
-| UAT-03 | MR không thấy menu Quản trị | PENDING MANUAL |
-| UAT-04 | MR chỉ thấy khách hàng được phân công | PENDING MANUAL |
-| UAT-05 | MR nhập kê đơn, dữ liệu hiện lại trên danh sách | PENDING MANUAL |
-| UAT-06 | MR nhập doanh số, dashboard cập nhật | PENDING MANUAL |
+| UAT-02 | Quản lý thấy dashboard và menu Quản trị | PENDING MANUAL |
+| UAT-03 | Nhân viên không thấy menu Quản trị | PENDING MANUAL |
+| UAT-04 | Nhân viên chỉ thấy khách hàng được phân công | PENDING MANUAL |
+| UAT-05 | Nhân viên nhập kê đơn, dữ liệu hiện lại trên danh sách | PENDING MANUAL |
+| UAT-06 | Nhân viên nhập doanh số, dashboard cập nhật | PENDING MANUAL |
 | UAT-07 | Cập nhật tiến độ thầu | PENDING MANUAL |
 | UAT-08 | Cảnh báo mất sale 4 tháng | PENDING MANUAL |
 | UAT-09 | Nhắc nhân viên chưa báo cáo ngày | PENDING MANUAL |
-| UAT-10 | Admin thêm tài khoản nhân viên | PENDING MANUAL |
-| UAT-11 | Admin sửa tài khoản nhân viên | PENDING MANUAL |
-| UAT-12 | Admin ngừng kích hoạt tài khoản | PENDING MANUAL |
-| UAT-13 | Admin thêm/sửa địa bàn | PENDING MANUAL |
-| UAT-14 | Admin thêm/sửa sản phẩm | PENDING MANUAL |
-| UAT-15 | Admin thêm/sửa khách hàng | PENDING MANUAL |
-| UAT-16 | Admin phân công địa bàn | PENDING MANUAL |
-| UAT-17 | Admin phân công khách hàng cho MR | PENDING MANUAL |
-| UAT-18 | MR gọi API quản trị bị chặn | PENDING API WITH DB |
-| UAT-19 | MR nhập khách hàng ngoài quyền bị chặn | PENDING API WITH DB |
+| UAT-10 | Quản lý thêm tài khoản nhân viên | PENDING MANUAL |
+| UAT-11 | Quản lý sửa tài khoản nhân viên | PENDING MANUAL |
+| UAT-12 | Quản lý xóa tài khoản nhân viên | PENDING MANUAL |
+| UAT-13 | Quản lý thêm/sửa địa bàn | PENDING MANUAL |
+| UAT-14 | Quản lý thêm/sửa sản phẩm | PENDING MANUAL |
+| UAT-15 | Quản lý thêm/sửa khách hàng | PENDING MANUAL |
+| UAT-16 | Quản lý phân công địa bàn | PENDING MANUAL |
+| UAT-17 | Quản lý phân công khách hàng cho nhân viên | PENDING MANUAL |
+| UAT-18 | Nhân viên gọi API quản trị bị chặn | PENDING API WITH DB |
+| UAT-19 | Nhân viên nhập khách hàng ngoài quyền bị chặn | PENDING API WITH DB |
 | UAT-20 | Mở workbook/CSV mẫu data thật | PASS FILE EXISTS |
 | UAT-21 | Push GitHub để Netlify CI/CD deploy | PASS |
 
@@ -116,3 +116,4 @@ Kết quả:
 MVP đạt các kiểm tra kỹ thuật nền tảng: build, routing, functions, dữ liệu mẫu, form quản trị, và loại bỏ n8n khỏi app path.
 
 UAT nghiệp vụ đầy đủ trên production cần bước đăng nhập Netlify để xác nhận thao tác UI thật. Trạng thái `401` hiện tại là hợp lệ với cấu hình SSO đang bật, không phải lỗi build.
+

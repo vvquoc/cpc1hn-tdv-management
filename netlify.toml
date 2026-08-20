@@ -45,6 +45,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/v1/data-transfer"
+  to = "/.netlify/functions/data-transfer"
+  status = 200
+
+[[redirects]]
   from = "/api/v1/lost-sales-trigger"
   to = "/.netlify/functions/lost-sales-trigger"
   status = 200

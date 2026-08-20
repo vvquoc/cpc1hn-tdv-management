@@ -1,4 +1,4 @@
 id_nhan_vien,id_dia_ban,is_primary
 NV-DN-01,DB_DANANG,true
-NV-SV-01,DB_DANANG,true
-NV-SV-01,DB_QUANGNAM,false
+NV-QL-01,DB_DANANG,true
+NV-QL-01,DB_QUANGNAM,false

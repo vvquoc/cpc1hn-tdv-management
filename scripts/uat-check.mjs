@@ -43,6 +43,7 @@ check("UAT-AUTO-02", "Public API routes are mapped to Netlify functions", () => 
     "sales",
     "tenders",
     "admin-data",
+    "data-transfer",
     "lost-sales-trigger",
     "daily-reminders",
     "health"
@@ -79,7 +80,7 @@ check("UAT-AUTO-04", "Role scope helpers are present", () => {
   assert(auth.includes("isAdmin"), "Missing isAdmin");
   assert(auth.includes("customerScopeSql"), "Missing customerScopeSql");
   assert(auth.includes("assertCustomerAccess"), "Missing assertCustomerAccess");
-  assert(auth.includes("Admin") && auth.includes("Manager") && auth.includes("Supervisor"), "Missing expected roles");
+  assert(auth.includes("QuanLy") && auth.includes("Admin") && auth.includes("Manager"), "Missing manager role compatibility");
 });
 
 check("UAT-AUTO-05", "Admin management forms exist in the UI", () => {
@@ -100,7 +101,7 @@ check("UAT-AUTO-05", "Admin management forms exist in the UI", () => {
 
 check("UAT-AUTO-06", "Website writes operational data through role-scoped APIs", () => {
   const app = read("src/app.js");
-  const endpoints = ["/api/v1/prescriptions", "/api/v1/sales", "/api/v1/tenders", "/api/v1/admin-data"];
+  const endpoints = ["/api/v1/prescriptions", "/api/v1/sales", "/api/v1/tenders", "/api/v1/admin-data", "/api/v1/data-transfer"];
   for (const endpoint of endpoints) {
     assert(app.includes(endpoint), `Missing frontend call to ${endpoint}`);
   }
@@ -144,6 +145,7 @@ check("UAT-AUTO-09", "Netlify functions can be loaded by Node", () => {
     "sales",
     "tenders",
     "admin-data",
+    "data-transfer",
     "lost-sales-trigger",
     "daily-reminders",
     "health"

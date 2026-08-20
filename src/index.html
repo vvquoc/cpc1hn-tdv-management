@@ -158,21 +158,53 @@
         <section id="admin" class="section" data-admin-only>
           <div class="section-heading">
             <h2>Quản trị dữ liệu</h2>
-            <span>Admin/Manager thêm, sửa, ngừng hoạt động dữ liệu thật ngay trên website.</span>
+            <span>Quản lý thêm, sửa, xóa và import/export dữ liệu thật ngay trên website.</span>
+          </div>
+
+          <div class="data-transfer">
+            <div>
+              <h3>Import / Export</h3>
+              <p>Tải file mẫu, điền dữ liệu thật, rồi import theo từng nhóm dữ liệu.</p>
+            </div>
+            <div class="transfer-actions">
+              <a class="button-link secondary-button" href="./templates/cpc1hn_data_import_template.xlsx" download>Tải file mẫu Excel</a>
+              <a id="sampleCsvLink" class="button-link secondary-button" href="./templates/csv/tb_nhan_su.csv" download>Tải CSV mẫu theo nhóm</a>
+              <button id="exportData" type="button">Export JSON</button>
+            </div>
+            <form id="importForm" class="form-grid">
+              <label>Nhóm dữ liệu
+                <select name="resource" required>
+                  <option value="employees">Nhân sự</option>
+                  <option value="territories">Địa bàn</option>
+                  <option value="products">Sản phẩm</option>
+                  <option value="customers">Khách hàng</option>
+                  <option value="employeeTerritories">Phân địa bàn</option>
+                  <option value="employeeCustomers">Phân khách hàng</option>
+                  <option value="prescriptions">Kê đơn</option>
+                  <option value="sales">Doanh số</option>
+                  <option value="tenders">Thầu</option>
+                  <option value="dailyReports">Báo cáo ngày</option>
+                  <option value="kpiTargets">KPI</option>
+                </select>
+              </label>
+              <label>File CSV<input name="file" type="file" accept=".csv,text/csv" required /></label>
+              <button type="submit">Import CSV</button>
+            </form>
           </div>
 
           <div class="admin-grid">
             <form id="employeeForm" class="admin-form">
-              <h3>Nhân sự / tài khoản</h3>
+              <div class="form-title">
+                <h3>Nhân sự / tài khoản</h3>
+                <button class="secondary-button" type="reset">Mới</button>
+              </div>
               <label>Mã nhân viên<input name="id" placeholder="NV-DN-02" required /></label>
               <label>Họ tên<input name="name" required /></label>
               <label>Email đăng nhập<input name="email" type="email" required /></label>
               <label>Vai trò
                 <select name="role" required>
-                  <option value="MR">MR</option>
-                  <option value="Supervisor">Supervisor</option>
-                  <option value="Manager">Manager</option>
-                  <option value="Admin">Admin</option>
+                  <option value="NhanVien">Nhân viên</option>
+                  <option value="QuanLy">Quản lý</option>
                 </select>
               </label>
               <label>Trạng thái
@@ -185,7 +217,10 @@
             </form>
 
             <form id="territoryForm" class="admin-form">
-              <h3>Địa bàn</h3>
+              <div class="form-title">
+                <h3>Địa bàn</h3>
+                <button class="secondary-button" type="reset">Mới</button>
+              </div>
               <label>Mã địa bàn<input name="id" placeholder="DB_HUE" required /></label>
               <label>Tên địa bàn<input name="name" required /></label>
               <label>Khu vực<input name="region" placeholder="Miền Trung" required /></label>
@@ -193,7 +228,10 @@
             </form>
 
             <form id="productForm" class="admin-form">
-              <h3>Sản phẩm</h3>
+              <div class="form-title">
+                <h3>Sản phẩm</h3>
+                <button class="secondary-button" type="reset">Mới</button>
+              </div>
               <label>Mã sản phẩm<input name="id" placeholder="SP_NEW" required /></label>
               <label>Tên sản phẩm<input name="name" required /></label>
               <label>Hoạt chất<input name="activeIngredient" /></label>
@@ -219,7 +257,10 @@
             </form>
 
             <form id="customerForm" class="admin-form">
-              <h3>Khách hàng</h3>
+              <div class="form-title">
+                <h3>Khách hàng</h3>
+                <button class="secondary-button" type="reset">Mới</button>
+              </div>
               <label>Mã khách hàng<input name="id" placeholder="KH_PM_DN_02" required /></label>
               <label>Tên khách hàng<input name="name" required /></label>
               <label>Loại
@@ -269,6 +310,14 @@
             <div>
               <h3>Khách hàng hiện có</h3>
               <ul id="customerAdminList" class="list"></ul>
+            </div>
+            <div>
+              <h3>Phân địa bàn hiện có</h3>
+              <ul id="territoryAssignmentList" class="list"></ul>
+            </div>
+            <div>
+              <h3>Phân khách hàng hiện có</h3>
+              <ul id="customerAssignmentList" class="list"></ul>
             </div>
           </div>
         </section>

@@ -13,9 +13,9 @@ const today = currentDate();
 
 const seed = {
   employees: [
-    { id: "NV-DN-01", name: "Nguyễn Minh Anh", email: "mr.danang@cpc1hn.vn", role: "MR", territoryIds: ["DB_DANANG"] },
-    { id: "NV-QN-01", name: "Trần Hồng Phúc", email: "mr.quangnam@cpc1hn.vn", role: "MR", territoryIds: ["DB_QUANGNAM"] },
-    { id: "NV-SV-01", name: "Lê Thu Hà", email: "supervisor.mt@cpc1hn.vn", role: "Supervisor", territoryIds: ["DB_DANANG", "DB_QUANGNAM", "DB_QUANGNGAI"] }
+    { id: "NV-DN-01", name: "Nguyễn Minh Anh", email: "nhanvien.danang@cpc1hn.vn", role: "NhanVien", territoryIds: ["DB_DANANG"] },
+    { id: "NV-QN-01", name: "Trần Hồng Phúc", email: "nhanvien.quangnam@cpc1hn.vn", role: "NhanVien", territoryIds: ["DB_QUANGNAM"] },
+    { id: "NV-QL-01", name: "Lê Thu Hà", email: "quanly@cpc1hn.vn", role: "QuanLy", territoryIds: ["DB_DANANG", "DB_QUANGNAM", "DB_QUANGNGAI"] }
   ],
   customers: [
     { id: "KH_PM_DN_01", name: "Phòng mạch Hải Châu", type: "PhongMachTu", territoryId: "DB_DANANG", ownerId: "NV-DN-01" },
@@ -53,7 +53,7 @@ function computeLostSales(data = seed) {
 
 function computeDailyReminders(data = seed) {
   return data.employees.filter((employee) => {
-    return employee.role === "MR" && !data.dailyReports.some((report) => report.employeeId === employee.id && report.date === today);
+    return ["NhanVien", "MR", "Supervisor"].includes(employee.role) && !data.dailyReports.some((report) => report.employeeId === employee.id && report.date === today);
   });
 }
 

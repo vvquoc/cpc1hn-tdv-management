@@ -51,13 +51,13 @@ const sheets = [
   {
     name: "tb_nhan_su",
     title: "Nhân sự",
-    note: "Email phải đúng email đăng nhập. chuc_vu chỉ dùng MR, Supervisor, Manager hoặc Admin.",
+    note: "Email phải đúng email đăng nhập. chuc_vu chỉ dùng NhanVien hoặc QuanLy.",
     headers: ["id_nhan_vien", "ten_nhan_vien", "email", "chuc_vu", "trang_thai"],
     required: ["id_nhan_vien", "ten_nhan_vien", "email", "chuc_vu", "trang_thai"],
-    validations: { chuc_vu: ["MR", "Supervisor", "Manager", "Admin"], trang_thai: ["Active", "Inactive"] },
+    validations: { chuc_vu: ["NhanVien", "QuanLy"], trang_thai: ["Active", "Inactive"] },
     examples: [
-      ["NV-DN-01", "Nguyễn Minh Anh", "mr.danang@cpc1hn.vn", "MR", "Active"],
-      ["NV-SV-01", "Lê Thu Hà", "supervisor.mt@cpc1hn.vn", "Supervisor", "Active"]
+      ["NV-DN-01", "Nguyễn Minh Anh", "nhanvien.danang@cpc1hn.vn", "NhanVien", "Active"],
+      ["NV-QL-01", "Phạm Quốc Bảo", "quanly@cpc1hn.vn", "QuanLy", "Active"]
     ]
   },
   {
@@ -69,8 +69,8 @@ const sheets = [
     validations: { is_primary: ["TRUE", "FALSE"] },
     examples: [
       ["NV-DN-01", "DB_DANANG", true],
-      ["NV-SV-01", "DB_DANANG", true],
-      ["NV-SV-01", "DB_QUANGNAM", false]
+      ["NV-QL-01", "DB_DANANG", true],
+      ["NV-QL-01", "DB_QUANGNAM", false]
     ]
   },
   {
@@ -166,10 +166,8 @@ const sheets = [
 
 const codebookRows = [
   ["Danh mục", "Giá trị", "Ý nghĩa"],
-  ["chuc_vu", "MR", "Trình dược viên"],
-  ["chuc_vu", "Supervisor", "Quản lý vùng"],
-  ["chuc_vu", "Manager", "Quản lý toàn hệ thống"],
-  ["chuc_vu", "Admin", "Quản trị hệ thống"],
+  ["chuc_vu", "NhanVien", "Nhân viên nhập dữ liệu theo khách hàng được phân công"],
+  ["chuc_vu", "QuanLy", "Quản lý toàn hệ thống, được quản trị và import/export dữ liệu"],
   ["trang_thai", "Active", "Đang hoạt động"],
   ["trang_thai", "Inactive", "Ngừng hoạt động"],
   ["loai_khach_hang", "BenhVien", "Bệnh viện"],
@@ -315,7 +313,11 @@ async function main() {
   const repoXlsx = path.join(repoTemplateDir, "cpc1hn_data_import_template.xlsx");
   const outputXlsx = path.join(outputDir, "cpc1hn_data_import_template.xlsx");
   await xlsx.save(repoXlsx);
-  await xlsx.save(outputXlsx);
+  try {
+    await xlsx.save(outputXlsx);
+  } catch (error) {
+    console.warn(`Skipped locked preview copy: ${error.message}`);
+  }
 
   const index = [
     "# CPC1HN Data Templates",

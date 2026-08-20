@@ -6,7 +6,7 @@ function requireAdmin(user) {
   if (!isAdmin(user)) {
     const error = new Error("Admin permission required");
     error.statusCode = 403;
-    error.publicMessage = "Chỉ Admin/Manager được quản trị dữ liệu.";
+    error.publicMessage = "Chỉ Quản lý được quản trị dữ liệu.";
     throw error;
   }
 }
@@ -24,6 +24,7 @@ async function upsertTerritory(data) {
 }
 
 async function upsertEmployee(data) {
+  const role = ["QuanLy", "Admin", "Manager"].includes(data.role) ? "QuanLy" : "NhanVien";
   return one(
     `insert into tb_nhan_su (id_nhan_vien, ten_nhan_vien, email, chuc_vu, trang_thai)
      values ($1, $2, lower($3), $4, coalesce($5, 'Active'))
@@ -33,7 +34,7 @@ async function upsertEmployee(data) {
                    chuc_vu = excluded.chuc_vu,
                    trang_thai = excluded.trang_thai
      returning id_nhan_vien as id`,
-    [data.id, data.name, data.email, data.role, data.status || "Active"]
+    [data.id, data.name, data.email, role, data.status || "Active"]
   );
 }
 
