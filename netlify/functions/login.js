@@ -1,13 +1,13 @@
 const crypto = require("node:crypto");
-const { one, query } = require("./shared/db");
-const { hashToken, loadUserById } = require("./shared/auth");
+const { hashToken } = require("./shared/auth");
+const { loadData, saveData, withTerritories } = require("./shared/store");
 const { handleError, json, methodNotAllowed, parseBody } = require("./shared/http");
 
 function verifyPassword(password, credential) {
-  const expected = Buffer.from(credential.password_hash, "hex");
+  const expected = Buffer.from(credential.passwordHash, "hex");
   const actual = crypto.pbkdf2Sync(
     String(password || ""),
-    credential.password_salt,
+    credential.passwordSalt,
     Number(credential.iterations || 210000),
     expected.length,
     "sha256"
@@ -22,34 +22,30 @@ exports.handler = async (event) => {
     const body = parseBody(event);
     const username = String(body.username || "").trim();
     const password = String(body.password || "");
+    const data = await loadData();
+    const credential = data.credentials.find((item) => item.username === username);
+    const employee = credential && data.employees.find((item) => item.id === credential.employeeId && item.status !== "Inactive");
 
-    const credential = await one(
-      `select ac.username, ac.id_nhan_vien, ac.password_salt, ac.password_hash, ac.iterations
-       from auth_credentials ac
-       join tb_nhan_su ns on ns.id_nhan_vien = ac.id_nhan_vien
-       where ac.username = $1 and ns.trang_thai = 'Active'`,
-      [username]
-    );
-
-    if (!credential || !verifyPassword(password, credential)) {
+    if (!credential || !employee || !verifyPassword(password, credential)) {
       return json(401, { error: "Sai tài khoản hoặc mật khẩu." });
     }
 
     const token = crypto.randomBytes(32).toString("hex");
-    await query(
-      `insert into auth_sessions (token_hash, id_nhan_vien, expires_at)
-       values ($1, $2, now() + interval '14 days')`,
-      [hashToken(token), credential.id_nhan_vien]
-    );
+    data.sessions.push({
+      tokenHash: hashToken(token),
+      employeeId: employee.id,
+      expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+    });
+    await saveData(data);
 
-    const user = await loadUserById(credential.id_nhan_vien);
+    const user = withTerritories(data, employee);
     return json(200, {
       token,
       user: {
-        id: user.id_nhan_vien,
-        name: user.ten_nhan_vien,
+        id: user.id,
+        name: user.name,
         email: user.email,
-        role: user.chuc_vu,
+        role: user.role,
         territoryIds: user.territoryIds
       }
     });

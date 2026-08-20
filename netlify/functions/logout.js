@@ -1,5 +1,5 @@
 const { hashToken } = require("./shared/auth");
-const { query } = require("./shared/db");
+const { loadData, saveData } = require("./shared/store");
 const { handleError, json, methodNotAllowed } = require("./shared/http");
 
 function getBearerToken(event) {
@@ -14,7 +14,10 @@ exports.handler = async (event) => {
   try {
     const token = getBearerToken(event);
     if (token) {
-      await query(`delete from auth_sessions where token_hash = $1`, [hashToken(token)]);
+      const data = await loadData();
+      const tokenHash = hashToken(token);
+      data.sessions = data.sessions.filter((session) => session.tokenHash !== tokenHash);
+      await saveData(data);
     }
     return json(200, { ok: true });
   } catch (error) {

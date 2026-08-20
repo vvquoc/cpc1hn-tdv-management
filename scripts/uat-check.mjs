@@ -78,11 +78,14 @@ check("UAT-AUTO-03", "Database migration contains core business tables", () => {
 
 check("UAT-AUTO-04", "Role scope helpers are present", () => {
   const auth = read("netlify/functions/shared/auth.js");
+  const store = read("netlify/functions/shared/store.js");
   assert(auth.includes("requireUser"), "Missing requireUser");
   assert(auth.includes("isAdmin"), "Missing isAdmin");
   assert(auth.includes("customerScopeSql"), "Missing customerScopeSql");
   assert(auth.includes("assertCustomerAccess"), "Missing assertCustomerAccess");
-  assert(auth.includes("QuanLy") && auth.includes("Admin") && auth.includes("Manager"), "Missing manager role compatibility");
+  assert(store.includes("isManager"), "Missing manager role helper");
+  assert(store.includes("QuanLy") && store.includes("NhanVien"), "Missing simplified role model");
+  assert(store.includes("Admin") && store.includes("Manager"), "Missing legacy manager role compatibility");
 });
 
 check("UAT-AUTO-05", "Admin management forms exist in the UI", () => {

@@ -1,6 +1,6 @@
-const { query } = require("./shared/db");
-const { customerScopeSql, requireUser } = require("./shared/auth");
+const { requireUser } = require("./shared/auth");
 const { handleError, json, methodNotAllowed } = require("./shared/http");
+const { isManager, loadData, scopedCustomers } = require("./shared/store");
 
 function currentDate() {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -18,29 +18,23 @@ exports.handler = async (event) => {
 
   try {
     const user = await requireUser(event);
+    const data = await loadData();
     const today = currentDate();
-    const scope = customerScopeSql(user, "kh", 1);
-    const reminders = await query(
-      `select distinct ns.id_nhan_vien as "employeeId",
-              ns.ten_nhan_vien as "employeeName",
-              ns.email,
-              $${scope.nextIndex}::date::text as date,
-              'Nhắc ' || ns.ten_nhan_vien || ' gửi báo cáo KPI ngày ' || $${scope.nextIndex}::text || '.' as message
-       from tb_nhan_su ns
-       join employee_customers ec on ec.id_nhan_vien = ns.id_nhan_vien
-       join tb_khach_hang kh on kh.id_khach_hang = ec.id_khach_hang
-       where ns.chuc_vu in ('NhanVien', 'MR', 'Supervisor')
-         and ns.trang_thai = 'Active'
-         and ${scope.clause}
-         and not exists (
-           select 1
-           from daily_reports dr
-           where dr.id_nhan_vien = ns.id_nhan_vien
-             and dr.report_date = $${scope.nextIndex}::date
-         )
-       order by ns.ten_nhan_vien`,
-      [...scope.params, today]
-    );
+    const customers = scopedCustomers(data, user);
+    const customerIds = new Set(customers.map((customer) => customer.id));
+    const employeeIds = isManager(user)
+      ? new Set(data.employeeCustomers.filter((item) => customerIds.has(item.customerId)).map((item) => item.employeeId))
+      : new Set([user.id]);
+    const reminders = data.employees
+      .filter((employee) => employee.status !== "Inactive" && employee.role === "NhanVien" && employeeIds.has(employee.id))
+      .filter((employee) => !data.dailyReports.some((report) => report.employeeId === employee.id && report.date === today))
+      .map((employee) => ({
+        employeeId: employee.id,
+        employeeName: employee.name,
+        email: employee.email,
+        date: today,
+        message: `Nhắc ${employee.name} gửi báo cáo KPI ngày ${today}.`
+      }));
 
     return json(200, { reminders });
   } catch (error) {
