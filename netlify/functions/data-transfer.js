@@ -25,6 +25,37 @@ function upsert(items, row, match) {
   else items.push(row);
 }
 
+function fail(message) {
+  const error = new Error(message);
+  error.statusCode = 400;
+  error.publicMessage = message;
+  throw error;
+}
+
+function value(row, aliases) {
+  return aliases.map((key) => row[key]).find((item) => item !== undefined && item !== null && String(item).trim() !== "");
+}
+
+function validateImportRow(resource, row, rowNumber) {
+  const requiredByResource = {
+    employees: [["id_nhan_vien", "id"], ["ten_nhan_vien", "name"], ["email"]],
+    territories: [["id_dia_ban", "id"], ["ten_dia_ban", "name"], ["khu_vuc", "region"]],
+    products: [["id_san_pham", "id"], ["ten_san_pham", "name"], ["dang_bao_che", "dosageCode"], ["mo_ta_dang_bao_che", "dosageForm"]],
+    customers: [["id_khach_hang", "id"], ["ten_khach_hang", "name"], ["loai_khach_hang", "type"], ["id_dia_ban", "territoryId"]],
+    employeeTerritories: [["id_nhan_vien", "employeeId"], ["id_dia_ban", "territoryId"]],
+    employeeCustomers: [["id_nhan_vien", "employeeId"], ["id_khach_hang", "customerId"]],
+    prescriptions: [["ngay_bao_cao", "date"], ["id_nhan_vien", "employeeId"], ["id_khach_hang", "customerId"], ["id_san_pham", "productId"], ["so_luong_ke_don", "quantity"]],
+    sales: [["thang_nam", "period"], ["id_nhan_vien", "employeeId"], ["id_khach_hang", "customerId"], ["id_san_pham", "productId"], ["doanh_so_thuc", "amount"]],
+    tenders: [["id_goi_thau", "id"], ["id_nhan_vien", "employeeId"], ["id_khach_hang", "customerId"], ["id_san_pham", "productId"]],
+    dailyReports: [["report_date", "date"], ["id_nhan_vien", "employeeId"], ["summary"]],
+    kpiTargets: [["thang_nam", "period"], ["id_nhan_vien", "employeeId"]]
+  };
+  const groups = requiredByResource[resource];
+  if (!groups) fail("Loại dữ liệu import chưa được hỗ trợ.");
+  const missing = groups.find((aliases) => value(row, aliases) === undefined);
+  if (missing) fail(`Dòng ${rowNumber} thiếu cột bắt buộc: ${missing.join(" hoặc ")}.`);
+}
+
 function importRow(data, resource, row) {
   if (resource === "employees") {
     upsert(data.employees, {
@@ -119,9 +150,9 @@ function importRow(data, resource, row) {
 
 exports.handler = async (event) => {
   try {
-    const user = await requireUser(event);
+    const data = await loadData(event);
+    const user = await requireUser(event, data);
     requireManager(user);
-    const data = await loadData();
 
     if (event.httpMethod === "GET") {
       const { credentials, sessions, ...exportable } = data;
@@ -131,8 +162,11 @@ exports.handler = async (event) => {
     if (event.httpMethod !== "POST") return methodNotAllowed();
     const body = parseBody(event);
     const rows = Array.isArray(body.rows) ? body.rows : [];
+    if (!rows.length) fail("File import không có dòng dữ liệu.");
+    if (rows.length > 5000) fail("Mỗi lần chỉ được import tối đa 5.000 dòng.");
+    rows.forEach((row, index) => validateImportRow(body.resource, row, index + 2));
     for (const row of rows) importRow(data, body.resource, row);
-    await saveData(data);
+    await saveData(data, event);
     return json(200, { resource: body.resource, imported: rows.length });
   } catch (error) {
     return handleError(error);

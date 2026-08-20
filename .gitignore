@@ -9,3 +9,5 @@ yarn-error.log*
 pnpm-debug.log*
 dist/
 outputs/
+dbml-error.log
+*.inspect.ndjson

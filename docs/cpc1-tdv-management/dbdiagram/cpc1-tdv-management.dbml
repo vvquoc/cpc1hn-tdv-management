@@ -25,6 +25,7 @@ Table tb_dia_ban {
 
 Table tb_nhan_su {
   id_nhan_vien varchar [pk, note: 'mã nhân sự nội bộ']
+  ma_nhan_vien_sale varchar [unique, note: 'Mã NV kinh doanh từ DATA SALE, giữ dạng text và số 0 đầu']
   ten_nhan_vien varchar [not null]
   email varchar [unique, not null, note: 'email đăng nhập để phân quyền']
   chuc_vu employee_role [not null]
@@ -45,22 +46,26 @@ Table employee_territories {
 
 Table tb_san_pham {
   id_san_pham varchar [pk]
+  ma_hang_hoa_sale varchar [unique, note: 'Mã HH từ DATA SALE']
   ten_san_pham varchar [not null]
   hoat_chat varchar
   dang_bao_che varchar [not null, note: 'BFS, BOV, MDI, viên đặt đổ khuôn hoặc dạng khác']
   quy_cach varchar
+  don_vi_tinh_sale varchar [note: 'DVT từ DATA SALE']
   gia_ke_don decimal [not null]
   trang_thai varchar [default: 'Active']
 }
 
 Table tb_khach_hang {
   id_khach_hang varchar [pk]
+  ma_khach_hang_sale varchar [unique, note: 'Mã KH từ DATA SALE']
   ten_khach_hang varchar [not null]
   loai_khach_hang customer_type [not null]
   dia_chi text
   dien_thoai varchar
   id_dia_ban varchar [not null, ref: > tb_dia_ban.id_dia_ban]
   trang_thai varchar [default: 'Active']
+  nhom_khach_hang_sale varchar [note: 'Nhóm KH nguyên bản: Phòng mạch, BV Kê đơn, Thầu...']
 }
 
 Table employee_customers {
@@ -93,6 +98,62 @@ Table tb_doanh_thu {
   doanh_so_thuc decimal [not null]
   source_note varchar
   created_at timestamp [default: `now()`]
+}
+
+Table data_sale_import_batches {
+  id uuid [pk, default: `gen_random_uuid()`]
+  source_spreadsheet_id varchar [not null, note: 'Google Spreadsheet ID nguồn']
+  source_sheet_id bigint [not null, note: 'sheetId/gid nguồn']
+  source_title varchar
+  imported_by varchar [ref: > tb_nhan_su.id_nhan_vien]
+  status varchar [not null, default: 'Processing', note: 'Processing, Completed hoặc Failed']
+  row_count int [not null, default: 0]
+  started_at timestamp [not null, default: `now()`]
+  finished_at timestamp
+}
+
+Table data_sale_transactions {
+  id uuid [pk, default: `gen_random_uuid()`]
+  import_batch_id uuid [not null, ref: > data_sale_import_batches.id]
+  source_spreadsheet_id varchar [not null]
+  source_sheet_id bigint [not null]
+  source_row_number int [not null, note: 'Số dòng thực tế trong Google Sheet, bắt đầu từ 2']
+  row_hash varchar [not null, note: 'SHA-256 của 19 giá trị nguồn để kiểm tra thay đổi']
+
+  ten_quan_ly varchar [not null, note: 'Cột Quản lý']
+  ma_nhan_vien varchar [not null, note: 'Cột NV kinh doanh, giữ số 0 đầu']
+  ten_nhan_vien varchar [not null, note: 'Cột Tên NV KD']
+  tinh varchar [not null]
+  nhom_khach_hang varchar [not null]
+  thang smallint [not null]
+  nam smallint [not null]
+  ma_khach_hang varchar [not null]
+  ten_khach_hang varchar [not null]
+  ngay_chung_tu date [not null]
+  so_chung_tu_ngoai varchar [not null]
+  ma_hang_hoa varchar [not null]
+  ten_hang_hoa varchar [not null]
+  don_vi_tinh varchar [not null]
+  so_luong decimal(18,3) [not null]
+  don_gia decimal(18,3) [not null]
+  doanh_thu decimal(18,2) [not null]
+  he_so decimal(10,4) [not null]
+  doanh_so decimal(18,2) [not null, note: 'Giá trị KPI sale sau khi nhân hệ số']
+
+  id_nhan_vien varchar [ref: > tb_nhan_su.id_nhan_vien, note: 'Liên kết nội bộ sau khi đối chiếu mã sale']
+  id_khach_hang varchar [ref: > tb_khach_hang.id_khach_hang]
+  id_san_pham varchar [ref: > tb_san_pham.id_san_pham]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+
+  Indexes {
+    (source_spreadsheet_id, source_sheet_id, source_row_number) [unique, name: 'uq_data_sale_source_row']
+    (nam, thang, ma_nhan_vien) [name: 'idx_data_sale_employee_period']
+    (nam, thang, ma_khach_hang) [name: 'idx_data_sale_customer_period']
+    (nam, thang, ma_hang_hoa) [name: 'idx_data_sale_product_period']
+    (tinh, nhom_khach_hang, nam, thang) [name: 'idx_data_sale_scope_period']
+    ngay_chung_tu [name: 'idx_data_sale_document_date']
+  }
 }
 
 Table tb_thau {

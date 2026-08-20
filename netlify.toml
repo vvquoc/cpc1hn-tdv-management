@@ -60,6 +60,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/v1/data-sale-import"
+  to = "/.netlify/functions/data-sale-import"
+  status = 200
+
+[[redirects]]
   from = "/api/v1/lost-sales-trigger"
   to = "/.netlify/functions/lost-sales-trigger"
   status = 200

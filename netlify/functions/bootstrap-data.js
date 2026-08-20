@@ -6,8 +6,8 @@ exports.handler = async (event) => {
   if (event.httpMethod !== "GET") return methodNotAllowed();
 
   try {
-    const user = await requireUser(event);
-    const data = await loadData();
+    const data = await loadData(event);
+    const user = await requireUser(event, data);
     const customers = scopedCustomers(data, user);
     const customerIds = new Set(customers.map((customer) => customer.id));
     const manager = isAdmin(user);

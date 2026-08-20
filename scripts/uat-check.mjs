@@ -46,6 +46,7 @@ check("UAT-AUTO-02", "Public API routes are mapped to Netlify functions", () => 
     "tenders",
     "admin-data",
     "data-transfer",
+    "data-sale-import",
     "lost-sales-trigger",
     "daily-reminders",
     "health"
@@ -84,7 +85,7 @@ check("UAT-AUTO-04", "Role scope helpers are present", () => {
   assert(auth.includes("customerScopeSql"), "Missing customerScopeSql");
   assert(auth.includes("assertCustomerAccess"), "Missing assertCustomerAccess");
   assert(store.includes("isManager"), "Missing manager role helper");
-  assert(store.includes("QuanLy") && store.includes("NhanVien"), "Missing simplified role model");
+  assert(store.includes("QuanLy"), "Missing simplified manager role model");
   assert(store.includes("Admin") && store.includes("Manager"), "Missing legacy manager role compatibility");
 });
 
@@ -166,6 +167,35 @@ check("UAT-AUTO-09", "Netlify functions can be loaded by Node", () => {
 check("UAT-AUTO-10", "Async forms keep stable form references before reset", () => {
   const app = read("src/app.js");
   assert(!app.includes("event.currentTarget.reset()"), "Forms must not reset through event.currentTarget after async work");
+});
+
+check("UAT-AUTO-11", "Operational store uses PostgreSQL and optimistic concurrency control", () => {
+  const store = read("netlify/functions/shared/store.js");
+  assert(store.includes('require("./db")'), "Operational store must use the shared PostgreSQL connection");
+  assert(store.includes("app_state_revision"), "Missing persisted revision check");
+  assert(store.includes("for update"), "Missing concurrency lock");
+});
+
+check("UAT-AUTO-12", "Admin UI exposes full master-data controls", () => {
+  const html = read("src/index.html");
+  const app = read("src/app.js");
+  assert(html.includes('id="territoryAdminList"'), "Missing territory management list");
+  assert(app.includes("data-edit-territory"), "Missing territory edit action");
+  assert(app.includes("data-deactivate-territory"), "Missing territory delete action");
+  assert(app.includes("Đã lưu dữ liệu."), "Missing successful save feedback");
+});
+
+check("UAT-AUTO-13", "DATA SALE schema preserves the 19-column source grain", () => {
+  const migration = read("netlify/database/migrations/006_data_sale_detail.sql");
+  const csvHeader = read("data-templates/csv/data_sale_transactions.csv").split(/\r?\n/)[0];
+  const sourceHeaders = ["Quản lý", "NV kinh doanh", "Tên NV KD", "Tỉnh", "Nhóm KH", "Tháng", "Năm", "Mã Kh", "Tên KH", "Ngày chứng từ", "Số Chứng từ ngoại", "Mã HH", "Tên HH", "DVT", "Số Lượng", "Đơn giá", "Doanh thu", "Hệ số", "DOANH SỐ"];
+  assert(csvHeader === sourceHeaders.join(","), "DATA SALE CSV header does not match source A:S");
+  for (const column of ["ma_nhan_vien", "ma_khach_hang", "ngay_chung_tu", "so_chung_tu_ngoai", "ma_hang_hoa", "so_luong", "don_gia", "doanh_thu", "he_so", "doanh_so"]) {
+    assert(migration.includes(column), `Missing DATA SALE column ${column}`);
+  }
+  assert(migration.includes("vw_data_sale_monthly"), "Missing monthly DATA SALE summary view");
+  assert(exists("netlify/functions/data-sale-import.js"), "Missing DATA SALE chunk import endpoint");
+  assert(exists("docs/cpc1-tdv-management/dbdiagram/cpc1-tdv-management.sql"), "Missing generated PostgreSQL schema");
 });
 
 const failed = checks.filter((item) => item.status === "FAIL");

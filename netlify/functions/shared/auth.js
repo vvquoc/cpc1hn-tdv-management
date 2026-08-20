@@ -1,4 +1,5 @@
 const crypto = require("node:crypto");
+const { one, query } = require("./db");
 const { hasCustomerAccess, isManager, loadData, withTerritories } = require("./store");
 
 function base64Url(value) {
@@ -25,7 +26,10 @@ function createToken(employeeId) {
 
 function verifyToken(token) {
   const [payload, signature] = String(token || "").split(".");
-  if (!payload || !signature || signature !== signPayload(payload)) return null;
+  if (!payload || !signature) return null;
+  const expected = Buffer.from(signPayload(payload));
+  const actual = Buffer.from(signature);
+  if (expected.length !== actual.length || !crypto.timingSafeEqual(expected, actual)) return null;
 
   try {
     const data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
@@ -42,7 +46,7 @@ function getBearerToken(event) {
   return match ? match[1].trim() : "";
 }
 
-async function requireUser(event) {
+async function requireUser(event, existingData) {
   const token = getBearerToken(event);
   if (!token) {
     const error = new Error("Missing token");
@@ -51,7 +55,7 @@ async function requireUser(event) {
     throw error;
   }
 
-  const data = await loadData(event);
+  const data = existingData || await loadData(event);
   const session = verifyToken(token);
   if (!session) {
     const error = new Error("Invalid session");
@@ -71,6 +75,25 @@ async function requireUser(event) {
   return withTerritories(data, employee);
 }
 
+async function requireDatabaseUser(event) {
+  const session = verifyToken(getBearerToken(event));
+  if (!session) {
+    const error = new Error("Invalid session");
+    error.statusCode = 401;
+    error.publicMessage = "Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.";
+    throw error;
+  }
+  const employee = await one("select id_nhan_vien,ten_nhan_vien,email,chuc_vu,trang_thai from tb_nhan_su where id_nhan_vien=$1 and trang_thai='Active'", [session.employeeId]);
+  if (!employee) {
+    const error = new Error("Unknown database user");
+    error.statusCode = 403;
+    error.publicMessage = "Tài khoản chưa được phân quyền trong hệ thống.";
+    throw error;
+  }
+  const territories = await query("select id_dia_ban from employee_territories where id_nhan_vien=$1", [session.employeeId]);
+  return { id: employee.id_nhan_vien, name: employee.ten_nhan_vien, email: employee.email, role: employee.chuc_vu, status: employee.trang_thai, territoryIds: territories.map((row) => row.id_dia_ban) };
+}
+
 function isAdmin(user) {
   return isManager(user);
 }
@@ -79,8 +102,7 @@ function customerScopeSql() {
   return { clause: "true", params: [], nextIndex: 1 };
 }
 
-async function assertCustomerAccess(user, customerId) {
-  const data = await loadData();
+function assertCustomerAccess(data, user, customerId) {
   if (!hasCustomerAccess(data, user, customerId)) {
     const error = new Error(`Customer outside scope: ${customerId}`);
     error.statusCode = 403;
@@ -91,6 +113,7 @@ async function assertCustomerAccess(user, customerId) {
 
 module.exports = {
   requireUser,
+  requireDatabaseUser,
   isAdmin,
   customerScopeSql,
   assertCustomerAccess,

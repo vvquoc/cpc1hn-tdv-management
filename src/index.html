@@ -199,6 +199,7 @@
                   <option value="employeeCustomers">Phân khách hàng</option>
                   <option value="prescriptions">Kê đơn</option>
                   <option value="sales">Doanh số</option>
+                  <option value="dataSale">DATA SALE chi tiết</option>
                   <option value="tenders">Thầu</option>
                   <option value="dailyReports">Báo cáo ngày</option>
                   <option value="kpiTargets">KPI</option>
@@ -243,6 +244,12 @@
               <label>Mã địa bàn<input name="id" placeholder="DB_HUE" required /></label>
               <label>Tên địa bàn<input name="name" required /></label>
               <label>Khu vực<input name="region" placeholder="Miền Trung" required /></label>
+              <label>Trạng thái
+                <select name="status">
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </label>
               <button type="submit">Lưu địa bàn</button>
             </form>
 
@@ -329,6 +336,10 @@
             <div>
               <h3>Khách hàng hiện có</h3>
               <ul id="customerAdminList" class="list"></ul>
+            </div>
+            <div>
+              <h3>Địa bàn hiện có</h3>
+              <ul id="territoryAdminList" class="list"></ul>
             </div>
             <div>
               <h3>Phân địa bàn hiện có</h3>

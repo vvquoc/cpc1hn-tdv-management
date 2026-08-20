@@ -10,8 +10,8 @@ exports.handler = async (event) => {
   if (event.httpMethod !== "GET" && event.httpMethod !== "POST") return methodNotAllowed();
 
   try {
-    const user = await requireUser(event);
-    const data = await loadData();
+    const data = await loadData(event);
+    const user = await requireUser(event, data);
     const customers = scopedCustomers(data, user);
     const periods = latestPeriods(data.sales, 4);
     const alerts = customers

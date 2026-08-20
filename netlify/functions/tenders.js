@@ -4,15 +4,19 @@ const { loadData, saveData, scopedCustomers } = require("./shared/store");
 
 exports.handler = async (event) => {
   try {
-    const user = await requireUser(event);
-    const data = await loadData();
+    const data = await loadData(event);
+    const user = await requireUser(event, data);
 
     if (event.httpMethod === "POST") {
       const body = parseBody(event);
       if (!body.id || !body.customerId || !body.productId || !body.status) {
         return json(400, { error: "Dữ liệu thầu không hợp lệ." });
       }
-      await assertCustomerAccess(user, body.customerId);
+      assertCustomerAccess(data, user, body.customerId);
+      const product = data.products.find((item) => item.id === body.productId && item.status !== "Inactive");
+      if (!product) return json(400, { error: "Sản phẩm không hợp lệ." });
+      const existing = data.tenders.find((item) => item.id === body.id);
+      if (existing) assertCustomerAccess(data, user, existing.customerId);
       const row = {
         id: body.id,
         customerId: body.customerId,
@@ -26,7 +30,7 @@ exports.handler = async (event) => {
       const index = data.tenders.findIndex((item) => item.id === row.id);
       if (index >= 0) data.tenders[index] = { ...data.tenders[index], ...row };
       else data.tenders.push(row);
-      await saveData(data);
+      await saveData(data, event);
       return json(200, { id: row.id });
     }
 

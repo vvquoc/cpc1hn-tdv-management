@@ -1,119 +1,86 @@
-# Biên bản UAT - 2026-08-20
+# Biên bản QA/QC và UAT - 2026-08-20
 
 Hệ thống: CPC1HN TDV Management MVP  
-Môi trường kiểm tra: local workspace + Netlify CLI production build + production URL  
-Production URL: `https://cpc1hn-tdv-management.netlify.app`
+Production: `https://cpc1hn-tdv-management.netlify.app`
+Nhánh kiểm thử: `codex/backend-qa-hardening`
 
-## 1. Tóm tắt kết quả
+## 1. Kết luận hiện tại
 
-| Nhóm kiểm tra | Trạng thái | Ghi chú |
+| Nhóm | Kết quả | Ghi chú |
 | --- | --- | --- |
-| Build local | PASS | `npm run build` hoàn tất, sinh `dist/` |
-| UAT tự động | PASS | 9/9 kiểm tra pass |
-| Netlify build | PASS | Netlify CLI build production pass, đóng gói đủ 8 functions |
-| GitHub push | PASS | Commit UAT đã được đẩy lên `main` |
-| Netlify CI/CD deploy | PASS | Deploy production mới nhất trạng thái `ready` |
-| Function health local | PASS | Handler trả `200 {"ok":true,...}` |
-| Production HTTP | UPDATED | Netlify Edge Access/SSO đã được tắt sau biên bản này |
-| UI UAT production bằng terminal | PARTIAL | Có thể kiểm tra HTTP/API; thao tác UI đầy đủ vẫn cần test bằng trình duyệt người dùng |
+| Build ứng dụng | PASS | Sinh `dist/` thành công |
+| Netlify production build | PASS | Áp 7 migration, đóng gói đủ 12 Functions |
+| Kiểm tra cấu hình/UI | PASS 13/13 | Route, form, PostgreSQL, import template và CRUD |
+| Kiểm tra backend cô lập | PASS 18/18 | Auth, role, scope, CRUD và validation |
+| Kiểm tra database tích hợp | PASS | Đăng nhập `15795`, đọc PostgreSQL và import DATA SALE idempotent |
+| Production health trước sửa | PASS | `/api/v1/health` trả `200` |
+| Production login trước sửa | FAIL | Tài khoản quản lý trả `401` do credential trong store bị lệch |
+| Production UAT sau sửa | PENDING DEPLOY | Chờ đưa nhánh sửa lỗi lên GitHub/Netlify |
 
-## 2. Kết quả kiểm tra tự động
+## 2. Lỗi đã xác định và bản sửa
 
-Lệnh đã chạy:
+| Mức độ | Lỗi | Nguyên nhân | Xử lý |
+| --- | --- | --- | --- |
+| Critical | Không đăng nhập được tài khoản quản lý | Credential production lệch khỏi seed, không có migration database | Chuyển credential sang PostgreSQL và seed lại tài khoản quản lý bằng migration |
+| High | Lưu xong chưa thấy dữ liệu cập nhật | Netlify Blobs dùng một JSON chung và có thể đọc dữ liệu cũ | Chuyển toàn bộ dữ liệu nghiệp vụ sang PostgreSQL |
+| High | Hai người lưu cùng lúc có thể ghi đè dữ liệu | Không có transaction hoặc kiểm tra phiên bản | Thêm transaction, khóa revision và lỗi xung đột `409` |
+| High | DATA SALE 35.123 dòng chưa có mô hình chi tiết | Schema cũ chỉ lưu doanh số tổng hợp thủ công | Thêm bảng 19 cột nguồn, batch import, view tháng và upsert idempotent |
+| High | Một request đọc store nhiều lần | `requireUser` và handler cùng tải toàn bộ dữ liệu | Tái sử dụng cùng snapshot dữ liệu trong request |
+| High | Có thể ghi đè gói thầu ngoài phạm vi | Chỉ kiểm tra khách hàng mới, không kiểm tra bản ghi thầu hiện hữu | Kiểm tra quyền trên cả bản ghi cũ và dữ liệu mới |
+| High | Sửa tài khoản có thể làm lệch credential | Form không tải username hiện tại và có nguy cơ giữ dữ liệu autofill | Trả danh sách username an toàn, xóa ô mật khẩu khi mở form sửa |
+| Medium | CRUD địa bàn thiếu sửa/xóa trực quan | UI chỉ có form upsert, không có danh sách thao tác | Thêm danh sách địa bàn và nút sửa/xóa |
+| Medium | Dữ liệu sai có thể thành lỗi `500` | Thiếu validation và xử lý JSON lỗi | Bổ sung lỗi `400/404/409` và thông báo tiếng Việt |
+| Medium | Lỗi mạng làm mất phiên local | Frontend xóa token với mọi loại lỗi | Chỉ xóa phiên khi backend trả `401/403` |
+| Medium | Nội dung import có thể chèn HTML | Render dữ liệu động bằng `innerHTML` chưa escape | Escape toàn bộ dữ liệu động trước khi render |
 
-```bash
-npm run uat
-```
+## 3. Kiểm tra backend tự động
 
-Kết quả:
+Bộ `scripts/backend-uat.mjs` kiểm tra:
 
-| ID | Nội dung | Trạng thái |
-| --- | --- | --- |
-| UAT-AUTO-01 | Netlify build config publish `dist` và dùng Node 22 | PASS |
-| UAT-AUTO-02 | Route API public map đúng Netlify Functions | PASS |
-| UAT-AUTO-03 | Migration có đủ bảng nghiệp vụ cốt lõi | PASS |
-| UAT-AUTO-04 | Helper phân quyền có đủ `requireUser`, `isAdmin`, `customerScopeSql`, `assertCustomerAccess` | PASS |
-| UAT-AUTO-05 | UI có đủ form quản trị | PASS |
-| UAT-AUTO-06 | Website ghi dữ liệu qua các API role-scoped | PASS |
-| UAT-AUTO-07 | Luồng n8n không còn trong app path | PASS |
-| UAT-AUTO-08 | File mẫu data thật tồn tại | PASS |
-| UAT-AUTO-09 | Netlify Functions load được trong Node | PASS |
+1. Từ chối và chấp nhận đăng nhập đúng trường hợp.
+3. Từ chối JSON sai định dạng.
+4. Quản lý tạo sản phẩm, khách hàng và tài khoản nhân viên.
+5. Quản lý phân địa bàn và khách hàng.
+6. Nhân viên đăng nhập và chỉ thấy dữ liệu thuộc phạm vi.
+7. Nhân viên ghi kê đơn, doanh số và gói thầu.
+8. Backend chặn ghi chéo địa bàn và ghi đè gói thầu ngoài quyền.
+9. Backend chặn tự xóa tài khoản quản lý đang đăng nhập.
+10. Tài khoản nhân viên bị vô hiệu hóa không thể đăng nhập.
 
-## 3. Kết quả build
+Kết quả: `18 backend UAT checks passed.`
 
-Lệnh đã chạy:
+Smoke test với Netlify Database development xác nhận:
+
+1. Tài khoản `15795` đăng nhập với role `QuanLy`.
+2. Bootstrap đọc đúng dữ liệu PostgreSQL.
+3. Nhập cùng một dòng DATA SALE hai lần vẫn chỉ có một giao dịch nguồn.
+4. Dòng DATA SALE được liên kết đúng nhân viên `015795`, địa bàn, khách hàng và sản phẩm.
+
+## 4. Lệnh xác minh
 
 ```bash
 npm run build
+npm run uat
 netlify build
 ```
 
-Kết quả:
+Cả ba lệnh đều PASS trên workspace ngày 2026-08-20.
 
-- `npm run build`: PASS, build static app vào `dist/`.
-- `netlify build`: PASS.
-- Netlify đóng gói đủ functions:
-  - `admin-data.js`
-  - `bootstrap-data.js`
-  - `daily-reminders.js`
-  - `health.js`
-  - `lost-sales-trigger.js`
-  - `prescriptions.js`
-  - `sales.js`
-  - `tenders.js`
+## 5. UAT production bắt buộc sau deploy
 
-## 4. Kết quả kiểm tra production URL
-
-Kiểm tra:
-
-- `https://cpc1hn-tdv-management.netlify.app`
-- `https://cpc1hn-tdv-management.netlify.app/api/v1/health`
-
-Kết quả:
-
-- Kết quả cũ: từng trả `401` khi Netlify Edge Access/SSO bật.
-- Trạng thái mới: đã tắt SSO cấp site để website mở được ở mọi máy.
-- App hiện dùng đăng nhập tài khoản/mật khẩu riêng.
-
-## 5. UAT nghiệp vụ cần test tay sau khi đăng nhập Netlify
-
-| ID | Kịch bản | Trạng thái hiện tại |
+| ID | Kịch bản | Trạng thái |
 | --- | --- | --- |
-| UAT-01 | Mở production URL sau đăng nhập Netlify | PENDING MANUAL |
-| UAT-02 | Quản lý thấy dashboard và menu Quản trị | PENDING MANUAL |
-| UAT-03 | Nhân viên không thấy menu Quản trị | PENDING MANUAL |
-| UAT-04 | Nhân viên chỉ thấy khách hàng được phân công | PENDING MANUAL |
-| UAT-05 | Nhân viên nhập kê đơn, dữ liệu hiện lại trên danh sách | PENDING MANUAL |
-| UAT-06 | Nhân viên nhập doanh số, dashboard cập nhật | PENDING MANUAL |
-| UAT-07 | Cập nhật tiến độ thầu | PENDING MANUAL |
-| UAT-08 | Cảnh báo mất sale 4 tháng | PENDING MANUAL |
-| UAT-09 | Nhắc nhân viên chưa báo cáo ngày | PENDING MANUAL |
-| UAT-10 | Quản lý thêm tài khoản nhân viên | PENDING MANUAL |
-| UAT-11 | Quản lý sửa tài khoản nhân viên | PENDING MANUAL |
-| UAT-12 | Quản lý xóa tài khoản nhân viên | PENDING MANUAL |
-| UAT-13 | Quản lý thêm/sửa địa bàn | PENDING MANUAL |
-| UAT-14 | Quản lý thêm/sửa sản phẩm | PENDING MANUAL |
-| UAT-15 | Quản lý thêm/sửa khách hàng | PENDING MANUAL |
-| UAT-16 | Quản lý phân công địa bàn | PENDING MANUAL |
-| UAT-17 | Quản lý phân công khách hàng cho nhân viên | PENDING MANUAL |
-| UAT-18 | Nhân viên gọi API quản trị bị chặn | PENDING API WITH DB |
-| UAT-19 | Nhân viên nhập khách hàng ngoài quyền bị chặn | PENDING API WITH DB |
-| UAT-20 | Mở workbook/CSV mẫu data thật | PASS FILE EXISTS |
-| UAT-21 | Push GitHub để Netlify CI/CD deploy | PASS |
+| PROD-01 | Đăng nhập tài khoản quản lý | PENDING DEPLOY |
+| PROD-02 | Tạo, sửa, xóa nhân viên/sản phẩm/khách hàng/địa bàn | PENDING DEPLOY |
+| PROD-03 | Tạo tài khoản nhân viên và đăng nhập tài khoản mới | PENDING DEPLOY |
+| PROD-04 | Phân quyền địa bàn/khách hàng và kiểm tra dữ liệu hiển thị | PENDING DEPLOY |
+| PROD-05 | Ghi kê đơn, doanh số, thầu và đọc lại ngay | PENDING DEPLOY |
+| PROD-06 | Chặn API ngoài phạm vi bằng tài khoản nhân viên | PENDING DEPLOY |
+| PROD-07 | Import CSV và DATA SALE hợp lệ, từ chối file sai | PENDING DEPLOY |
+| PROD-08 | Export JSON | PENDING DEPLOY |
 
-## 6. Phát hiện và rủi ro
+## 6. Rủi ro còn lại
 
-| Mức độ | Nội dung | Ảnh hưởng | Đề xuất |
-| --- | --- | --- | --- |
-| Fixed | Production từng bật Netlify Edge Access/SSO | Link không mở được ở mọi máy | Đã tắt SSO cấp site |
-| Fixed | App từng dùng selector tài khoản demo | Không đủ điều kiện bàn giao public | Đã chuyển sang đăng nhập tài khoản/mật khẩu trong app |
-| Fixed | Dashboard từng dùng tháng demo `2026-08` | Có thể sai khi qua tháng khác | Đã chuyển sang tháng hiện tại theo giờ Việt Nam |
-| Fixed | Nhắc báo cáo từng cố định ngày `2026-08-20` | Có thể sai khi qua ngày khác | Đã chuyển sang ngày hiện tại theo giờ Việt Nam |
-| Low | UAT local DB chưa chạy end-to-end vì local Netlify DB khác production ở extension migration | Không ảnh hưởng build production đã pass, nhưng hạn chế dev offline | Tạo migration local-compatible hoặc seed test DB riêng |
-
-## 7. Kết luận
-
-MVP đạt các kiểm tra kỹ thuật nền tảng: build, routing, functions, dữ liệu mẫu, form quản trị, và loại bỏ n8n khỏi app path.
-
-UAT nghiệp vụ đầy đủ trên production cần đăng nhập bằng tài khoản trong app để xác nhận thao tác UI thật.
-
+1. Chưa deploy nhánh hiện tại nên production vẫn đang chạy bản cũ.
+2. Chưa nhập toàn bộ 35.123 dòng DATA SALE vào production; hiện mới xác minh dòng mẫu trên database development.
+3. Sau deploy cần chạy lại toàn bộ PROD-01 đến PROD-08 trên URL thật.

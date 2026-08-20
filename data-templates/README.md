@@ -15,7 +15,7 @@ Bộ file mẫu chuẩn bị dữ liệu thật cho hệ thống quản lý trì
 4. `tb_san_pham`
 5. `tb_khach_hang`
 6. `employee_customers`
-7. `tb_ke_don`, `tb_doanh_thu`, `tb_thau`, `daily_reports`, `kpi_targets`
+7. `tb_ke_don`, `tb_doanh_thu`, `data_sale_transactions`, `tb_thau`, `daily_reports`, `kpi_targets`
 
 ## Quy tắc
 
@@ -23,5 +23,6 @@ Bộ file mẫu chuẩn bị dữ liệu thật cho hệ thống quản lý trì
 - ID giữ dạng text.
 - Ngày dùng `yyyy-mm-dd`.
 - Tháng dùng `yyyy-mm`.
+- `data_sale_transactions` giữ nguyên 19 cột nguồn; mã NV kinh doanh phải là text để giữ số 0 đầu.
 - Tiền và số lượng nhập số, không nhập ký hiệu VND.
 - Không bỏ qua hai bảng phân quyền `employee_territories` và `employee_customers`.

@@ -13,7 +13,13 @@ const demoUsers = window.CPC1_SEED.employees;
 let state = structuredClone(window.CPC1_SEED);
 let apiReady = false;
 let authToken = localStorage.getItem(STORAGE_TOKEN_KEY) || "";
-let authUser = JSON.parse(localStorage.getItem(STORAGE_USER_KEY) || "null");
+let authUser;
+try {
+  authUser = JSON.parse(localStorage.getItem(STORAGE_USER_KEY) || "null");
+} catch {
+  localStorage.removeItem(STORAGE_USER_KEY);
+  authUser = null;
+}
 
 const roleLabel = {
   NhanVien: "Nhân viên",
@@ -33,6 +39,7 @@ const sampleCsvByResource = {
   employeeCustomers: "employee_customers.csv",
   prescriptions: "tb_ke_don.csv",
   sales: "tb_doanh_thu.csv",
+  dataSale: "data_sale_transactions.csv",
   tenders: "tb_thau.csv",
   dailyReports: "daily_reports.csv",
   kpiTargets: "kpi_targets.csv"
@@ -63,24 +70,47 @@ function canAdmin() {
 }
 
 async function api(path, options = {}) {
-  const response = await fetch(path, {
-    ...options,
-    headers: {
-      "content-type": "application/json",
-      ...(authToken ? { authorization: `Bearer ${authToken}` } : {}),
-      ...(options.headers || {})
-    }
-  });
+  let response;
+  try {
+    response = await fetch(path, {
+      ...options,
+      signal: options.signal || AbortSignal.timeout(45000),
+      headers: {
+        "content-type": "application/json",
+        ...(authToken ? { authorization: `Bearer ${authToken}` } : {}),
+        ...(options.headers || {})
+      }
+    });
+  } catch (error) {
+    const message = error.name === "TimeoutError"
+      ? "Máy chủ phản hồi quá lâu. Vui lòng thử lại."
+      : "Không kết nối được máy chủ. Vui lòng kiểm tra mạng và thử lại.";
+    const networkError = new Error(message);
+    networkError.status = 0;
+    throw networkError;
+  }
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(payload.error || "API request failed");
+    const error = new Error(payload.error || "Máy chủ không xử lý được yêu cầu.");
+    error.status = response.status;
+    throw error;
   }
   return payload;
 }
 
 function byId(collection, id) {
   return collection.find((item) => item.id === id);
+}
+
+function html(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[character]);
 }
 
 function latestPeriods(count) {
@@ -104,7 +134,7 @@ function computeLostSales(customers) {
 }
 
 function setOptions(select, items, labelFor) {
-  select.innerHTML = items.map((item) => `<option value="${item.id || item.email}">${labelFor(item)}</option>`).join("");
+  select.innerHTML = items.map((item) => `<option value="${html(item.id || item.email)}">${html(labelFor(item))}</option>`).join("");
 }
 
 function showNotice(message) {
@@ -142,15 +172,18 @@ async function loadData() {
       const assignments = await api("/api/v1/admin-data");
       state.employeeTerritories = assignments.employeeTerritories || [];
       state.employeeCustomers = assignments.employeeCustomers || [];
+      state.accounts = assignments.accounts || [];
     }
     showApp();
     showNotice("");
   } catch (error) {
     apiReady = false;
-    authToken = "";
-    authUser = null;
-    localStorage.removeItem(STORAGE_TOKEN_KEY);
-    localStorage.removeItem(STORAGE_USER_KEY);
+    if (error.status === 401 || error.status === 403) {
+      authToken = "";
+      authUser = null;
+      localStorage.removeItem(STORAGE_TOKEN_KEY);
+      localStorage.removeItem(STORAGE_USER_KEY);
+    }
     showLogin(error.message);
     return;
   }
@@ -192,7 +225,7 @@ function render() {
       const product = byId(state.products, item.productId) || {};
       const owner = byId(state.employees, item.employeeId) || {};
       const amount = item.amount || Number(item.quantity) * Number(product.prescriptionPrice || 0);
-      return `<tr><td>${item.date}</td><td>${owner.name || item.employeeId}</td><td>${customer.name || item.customerId}</td><td>${product.name || item.productId}</td><td>${item.quantity}</td><td>${currency.format(amount)}</td></tr>`;
+      return `<tr><td>${html(item.date)}</td><td>${html(owner.name || item.employeeId)}</td><td>${html(customer.name || item.customerId)}</td><td>${html(product.name || item.productId)}</td><td>${html(item.quantity)}</td><td>${html(currency.format(amount))}</td></tr>`;
     })
     .join("");
 
@@ -202,7 +235,7 @@ function render() {
     .map((item) => {
       const customer = byId(state.customers, item.customerId) || {};
       const product = byId(state.products, item.productId) || {};
-      return `<tr><td>${item.period}</td><td>${customer.name || item.customerId}</td><td>${product.name || item.productId}</td><td>${currency.format(item.amount)}</td></tr>`;
+      return `<tr><td>${html(item.period)}</td><td>${html(customer.name || item.customerId)}</td><td>${html(product.name || item.productId)}</td><td>${html(currency.format(item.amount))}</td></tr>`;
     })
     .join("");
 
@@ -212,7 +245,7 @@ function render() {
       const product = byId(state.products, item.productId) || {};
       const owner = byId(state.employees, item.employeeId) || {};
       const statusClass = item.status === "DangLamHoSo" ? "status-warn" : item.status === "TrungThau" ? "status-win" : "";
-      return `<tr><td>${item.id}</td><td>${customer.name || item.customerId}</td><td>${product.name || item.productId}</td><td><span class="status ${statusClass}">${statusLabel[item.status] || item.status}</span></td><td>${item.dueDate || ""}</td><td>${owner.name || item.employeeId}</td></tr>`;
+      return `<tr><td>${html(item.id)}</td><td>${html(customer.name || item.customerId)}</td><td>${html(product.name || item.productId)}</td><td><span class="status ${statusClass}">${html(statusLabel[item.status] || item.status)}</span></td><td>${html(item.dueDate || "")}</td><td>${html(owner.name || item.employeeId)}</td></tr>`;
     })
     .join("");
 
@@ -222,7 +255,7 @@ function render() {
 
 function renderAlerts(lostSales, reminders) {
   document.querySelector("#lostSaleList").innerHTML = lostSales.length
-    ? lostSales.map((customer) => `<li><strong>${customer.name || customer.customerName}</strong><br />Không phát sinh doanh số trong 4 tháng gần nhất.</li>`).join("")
+    ? lostSales.map((customer) => `<li><strong>${html(customer.name || customer.customerName)}</strong><br />Không phát sinh doanh số trong 4 tháng gần nhất.</li>`).join("")
     : "<li>Không có cảnh báo trong phạm vi hiện tại.</li>";
 
   const today = currentDate();
@@ -231,7 +264,7 @@ function renderAlerts(lostSales, reminders) {
     : (state.employees || []).filter((item) => ["NhanVien", "MR", "Supervisor"].includes(item.role) && !(state.dailyReports || []).some((report) => report.employeeId === item.id && report.date === today));
 
   document.querySelector("#reminderList").innerHTML = fallbackReminders.length
-    ? fallbackReminders.map((item) => `<li><strong>${item.employeeName || item.name}</strong><br />${item.message || `Chưa có báo cáo ngày ${today}.`}</li>`).join("")
+    ? fallbackReminders.map((item) => `<li><strong>${html(item.employeeName || item.name)}</strong><br />${html(item.message || `Chưa có báo cáo ngày ${today}.`)}</li>`).join("")
     : "<li>Tất cả TDV trong phạm vi đã báo cáo hôm nay.</li>";
 }
 
@@ -249,6 +282,7 @@ async function postAdmin(resource, data, action = "upsert") {
     body: JSON.stringify({ resource, action, data })
   });
   await loadData();
+  showNotice(action === "deactivate" || action === "remove" ? "Đã xóa dữ liệu." : "Đã lưu dữ liệu.");
 }
 
 function downloadFile(fileName, content, type = "application/json") {
@@ -294,7 +328,30 @@ function parseCsv(text) {
   row.push(field.trim());
   if (row.some((cell) => cell !== "")) rows.push(row);
   const headers = rows.shift() || [];
+  if (headers[0]) headers[0] = headers[0].replace(/^\uFEFF/, "");
   return rows.map((cells) => Object.fromEntries(headers.map((header, index) => [header, cells[index] || ""])));
+}
+
+async function importDataSale(rows) {
+  const chunkSize = 500;
+  let batchId = null;
+  let imported = 0;
+  for (let index = 0; index < rows.length; index += chunkSize) {
+    const chunk = rows.slice(index, index + chunkSize);
+    const result = await api("/api/v1/data-sale-import", {
+      method: "POST",
+      body: JSON.stringify({
+        batchId,
+        startRow: index + 2,
+        rows: chunk,
+        final: index + chunk.length >= rows.length
+      })
+    });
+    batchId = result.batchId;
+    imported += result.imported || 0;
+    showNotice(`Đang nhập DATA SALE: ${imported}/${rows.length} dòng.`);
+  }
+  return imported;
 }
 
 function fillForm(formId, data) {
@@ -318,26 +375,29 @@ function renderAdmin() {
   if (!adminVisible) return;
 
   const employees = state.employees || [];
+  const activeEmployees = employees.filter((employee) => employee.status !== "Inactive");
   const territories = state.territories || [];
+  const activeTerritories = territories.filter((territory) => territory.status !== "Inactive");
   const products = state.products || [];
   const customers = state.customers || [];
+  const activeCustomers = customers.filter((customer) => customer.status !== "Inactive");
 
   document.querySelectorAll("#territoryAssignForm select[name='employeeId'], #customerAssignForm select[name='employeeId']").forEach((select) => {
-    setOptions(select, employees, (employee) => `${employee.name} · ${roleLabel[employee.role] || employee.role}`);
+    setOptions(select, activeEmployees, (employee) => `${employee.name} · ${roleLabel[employee.role] || employee.role}`);
   });
   document.querySelectorAll("#customerForm select[name='territoryId'], #territoryAssignForm select[name='territoryId']").forEach((select) => {
-    setOptions(select, territories, (territory) => territory.name);
+    setOptions(select, activeTerritories, (territory) => territory.name);
   });
-  setOptions(document.querySelector("#customerAssignForm select[name='customerId']"), customers, (customer) => customer.name);
+  setOptions(document.querySelector("#customerAssignForm select[name='customerId']"), activeCustomers, (customer) => customer.name);
 
   document.querySelector("#employeeAdminList").innerHTML = employees
     .map((employee) => `
       <li>
-        <strong>${employee.name}</strong><br />
-        ${employee.id} · ${employee.email} · ${roleLabel[employee.role] || employee.role} · ${employee.status || "Active"}
+        <strong>${html(employee.name)}</strong><br />
+        ${html(employee.id)} · ${html(employee.email)} · ${html(roleLabel[employee.role] || employee.role)} · ${html(employee.status || "Active")}
         <div class="inline-actions">
-          <button class="secondary-button" data-edit-employee="${employee.id}">Sửa</button>
-          <button class="danger-button" data-deactivate-employee="${employee.id}">Xóa</button>
+          <button class="secondary-button" data-edit-employee="${html(employee.id)}">Sửa</button>
+          <button class="danger-button" data-deactivate-employee="${html(employee.id)}">Xóa</button>
         </div>
       </li>`)
     .join("");
@@ -345,11 +405,11 @@ function renderAdmin() {
   document.querySelector("#productAdminList").innerHTML = products
     .map((product) => `
       <li>
-        <strong>${product.name}</strong><br />
-        ${product.id} · ${product.dosageForm} · ${currency.format(product.prescriptionPrice || 0)} · ${product.status || "Active"}
+        <strong>${html(product.name)}</strong><br />
+        ${html(product.id)} · ${html(product.dosageForm)} · ${html(currency.format(product.prescriptionPrice || 0))} · ${html(product.status || "Active")}
         <div class="inline-actions">
-          <button class="secondary-button" data-edit-product="${product.id}">Sửa</button>
-          <button class="danger-button" data-deactivate-product="${product.id}">Xóa</button>
+          <button class="secondary-button" data-edit-product="${html(product.id)}">Sửa</button>
+          <button class="danger-button" data-deactivate-product="${html(product.id)}">Xóa</button>
         </div>
       </li>`)
     .join("");
@@ -357,11 +417,23 @@ function renderAdmin() {
   document.querySelector("#customerAdminList").innerHTML = customers
     .map((customer) => `
       <li>
-        <strong>${customer.name}</strong><br />
-        ${customer.id} · ${customer.type} · ${customer.territoryId} · ${customer.status || "Active"}
+        <strong>${html(customer.name)}</strong><br />
+        ${html(customer.id)} · ${html(customer.type)} · ${html(customer.territoryId)} · ${html(customer.status || "Active")}
         <div class="inline-actions">
-          <button class="secondary-button" data-edit-customer="${customer.id}">Sửa</button>
-          <button class="danger-button" data-deactivate-customer="${customer.id}">Xóa</button>
+          <button class="secondary-button" data-edit-customer="${html(customer.id)}">Sửa</button>
+          <button class="danger-button" data-deactivate-customer="${html(customer.id)}">Xóa</button>
+        </div>
+      </li>`)
+    .join("");
+
+  document.querySelector("#territoryAdminList").innerHTML = territories
+    .map((territory) => `
+      <li>
+        <strong>${html(territory.name)}</strong><br />
+        ${html(territory.id)} · ${html(territory.region)} · ${html(territory.status || "Active")}
+        <div class="inline-actions">
+          <button class="secondary-button" data-edit-territory="${html(territory.id)}">Sửa</button>
+          <button class="danger-button" data-deactivate-territory="${html(territory.id)}">Xóa</button>
         </div>
       </li>`)
     .join("");
@@ -371,10 +443,10 @@ function renderAdmin() {
       const employee = byId(employees, assignment.employeeId) || {};
       const territory = byId(territories, assignment.territoryId) || {};
       return `<li>
-        <strong>${employee.name || assignment.employeeId}</strong><br />
-        ${territory.name || assignment.territoryId}${assignment.isPrimary ? " · Địa bàn chính" : ""}
+        <strong>${html(employee.name || assignment.employeeId)}</strong><br />
+        ${html(territory.name || assignment.territoryId)}${assignment.isPrimary ? " · Địa bàn chính" : ""}
         <div class="inline-actions">
-          <button class="danger-button" data-remove-territory="${assignment.employeeId}:${assignment.territoryId}">Xóa phân công</button>
+          <button class="danger-button" data-remove-territory="${html(assignment.employeeId)}:${html(assignment.territoryId)}">Xóa phân công</button>
         </div>
       </li>`;
     })
@@ -385,10 +457,10 @@ function renderAdmin() {
       const employee = byId(employees, assignment.employeeId) || {};
       const customer = byId(customers, assignment.customerId) || {};
       return `<li>
-        <strong>${employee.name || assignment.employeeId}</strong><br />
-        ${customer.name || assignment.customerId}
+        <strong>${html(employee.name || assignment.employeeId)}</strong><br />
+        ${html(customer.name || assignment.customerId)}
         <div class="inline-actions">
-          <button class="danger-button" data-remove-customer="${assignment.employeeId}:${assignment.customerId}">Xóa phân công</button>
+          <button class="danger-button" data-remove-customer="${html(assignment.employeeId)}:${html(assignment.customerId)}">Xóa phân công</button>
         </div>
       </li>`;
     })
@@ -403,16 +475,13 @@ function bindForms() {
     document.querySelector("#loginMessage").textContent = "";
 
     try {
-      const response = await fetch("/api/v1/login", {
+      const payload = await api("/api/v1/login", {
         method: "POST",
-        headers: { "content-type": "application/json" },
         body: JSON.stringify({
           username: form.get("username"),
           password: form.get("password")
         })
       });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || "Không đăng nhập được.");
 
       authToken = payload.token;
       authUser = payload.user;
@@ -420,6 +489,7 @@ function bindForms() {
       localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(authUser));
       target.reset();
       await loadData();
+      showNotice("Đăng nhập thành công.");
     } catch (error) {
       showLogin(error.message);
     }
@@ -458,6 +528,7 @@ function bindForms() {
       target.reset();
       setDefaultDates();
       await loadData();
+      showNotice("Đã lưu kê đơn.");
     } catch (error) {
       showNotice(error.message);
     }
@@ -482,6 +553,7 @@ function bindForms() {
       target.reset();
       setDefaultDates();
       await loadData();
+      showNotice("Đã lưu doanh số.");
     } catch (error) {
       showNotice(error.message);
     }
@@ -499,6 +571,7 @@ function bindForms() {
       });
       target.reset();
       await loadData();
+      showNotice("Đã lưu gói thầu.");
     } catch (error) {
       showNotice(error.message);
     }
@@ -577,6 +650,7 @@ function bindForms() {
     const employeeId = button.dataset.editEmployee || button.dataset.deactivateEmployee;
     const productId = button.dataset.editProduct || button.dataset.deactivateProduct;
     const customerId = button.dataset.editCustomer || button.dataset.deactivateCustomer;
+    const territoryId = button.dataset.editTerritory || button.dataset.deactivateTerritory;
     const territoryAssignment = button.dataset.removeTerritory;
     const customerAssignment = button.dataset.removeCustomer;
 
@@ -584,6 +658,9 @@ function bindForms() {
       if (button.dataset.editEmployee) {
         const employee = byId(state.employees, employeeId);
         fillForm("#employeeForm", employee);
+        const account = (state.accounts || []).find((item) => item.employeeId === employeeId);
+        document.querySelector("#employeeForm [name='username']").value = account?.username || "";
+        document.querySelector("#employeeForm [name='password']").value = "";
       } else if (button.dataset.deactivateEmployee) {
         await postAdmin("employee", { id: employeeId }, "deactivate");
       } else if (button.dataset.editProduct) {
@@ -596,6 +673,11 @@ function bindForms() {
         fillForm("#customerForm", customer);
       } else if (button.dataset.deactivateCustomer) {
         await postAdmin("customer", { id: customerId }, "deactivate");
+      } else if (button.dataset.editTerritory) {
+        const territory = byId(state.territories, territoryId);
+        fillForm("#territoryForm", territory);
+      } else if (button.dataset.deactivateTerritory) {
+        await postAdmin("territory", { id: territoryId }, "deactivate");
       } else if (territoryAssignment) {
         const [employeeId, territoryId] = territoryAssignment.split(":");
         await postAdmin("employee_territory", { employeeId, territoryId }, "remove");
@@ -637,11 +719,13 @@ function bindForms() {
 
     try {
       const rows = parseCsv(await file.text());
-      const result = await api("/api/v1/data-transfer", {
-        method: "POST",
-        body: JSON.stringify({ resource, rows })
-      });
-      showNotice(`Import xong ${result.imported || 0} dòng.`);
+      const imported = resource === "dataSale"
+        ? await importDataSale(rows)
+        : (await api("/api/v1/data-transfer", {
+          method: "POST",
+          body: JSON.stringify({ resource, rows })
+        })).imported || 0;
+      showNotice(`Import xong ${imported} dòng.`);
       form.reset();
       await loadData();
     } catch (error) {

@@ -1,11 +1,11 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { SpreadsheetFile, Workbook } from "@oai/artifact-tool";
+import { FileBlob, SpreadsheetFile, Workbook } from "@oai/artifact-tool";
 
 const root = process.cwd();
 const repoTemplateDir = path.join(root, "data-templates");
 const csvDir = path.join(repoTemplateDir, "csv");
-const outputDir = path.join(root, "outputs", "cpc1hn-data-templates");
+const outputDir = path.join(root, "outputs", "cpc1hn-data-templates-data-sale");
 
 const commonFormats = {
   title: {
@@ -131,6 +131,16 @@ const sheets = [
     ]
   },
   {
+    name: "data_sale_transactions",
+    title: "DATA SALE chi tiết",
+    note: "Giữ nguyên 19 cột A:S từ Google Sheet DATA SALE. Mã nhân viên phải là text để giữ số 0 đầu. Ngày xuất CSV nên chuẩn hóa yyyy-mm-dd.",
+    headers: ["Quản lý", "NV kinh doanh", "Tên NV KD", "Tỉnh", "Nhóm KH", "Tháng", "Năm", "Mã Kh", "Tên KH", "Ngày chứng từ", "Số Chứng từ ngoại", "Mã HH", "Tên HH", "DVT", "Số Lượng", "Đơn giá", "Doanh thu", "Hệ số", "DOANH SỐ"],
+    required: ["NV kinh doanh", "Tên NV KD", "Tỉnh", "Nhóm KH", "Tháng", "Năm", "Mã Kh", "Tên KH", "Ngày chứng từ", "Số Chứng từ ngoại", "Mã HH", "Tên HH", "DVT", "Số Lượng", "Đơn giá", "Doanh thu", "Hệ số", "DOANH SỐ"],
+    examples: [
+      ["Trương Anh Tú", "015795", "Nguyễn Ngọc Phương Thảo", "Quảng Nam", "BV Kê đơn", 1, 2025, "KC01287", "Công Ty TNHH Y Khoa Minh Trí Hội An", new Date("2025-01-02"), "FB2531/00025", "W00504", "Hylaform 0,1% 10ml", "ONG", 40, 30714.286, 1228571, 1.5, 1842856.5]
+    ]
+  },
+  {
     name: "tb_thau",
     title: "Gói thầu",
     note: "Theo dõi trạng thái hồ sơ thầu. han_nop dùng yyyy-mm-dd.",
@@ -198,10 +208,10 @@ async function writeCsv(sheetDef) {
 function writeTableSheet(workbook, sheetDef) {
   const sheet = workbook.worksheets.add(sheetDef.name);
   sheet.showGridLines = false;
-  sheet.getRange("A1:H1").merge();
+  sheet.getRangeByIndexes(0, 0, 1, sheetDef.headers.length).merge();
   sheet.getRange("A1").values = [[sheetDef.title]];
   sheet.getRange("A1").format = commonFormats.title;
-  sheet.getRange("A2:H2").merge();
+  sheet.getRangeByIndexes(1, 0, 1, sheetDef.headers.length).merge();
   sheet.getRange("A2").values = [[sheetDef.note]];
   sheet.getRange("A2").format = commonFormats.subtitle;
 
@@ -222,8 +232,9 @@ function writeTableSheet(workbook, sheetDef) {
 
   sheetDef.headers.forEach((header, index) => {
     const columnRange = sheet.getRangeByIndexes(5, index, 45, 1);
+    const normalizedHeader = header.toLowerCase();
     columnRange.format = sheetDef.required.includes(header) ? commonFormats.required : commonFormats.optional;
-    if (header.includes("ngay") || header.includes("date") || header === "han_nop") {
+    if (normalizedHeader.includes("ngay") || normalizedHeader.includes("ngày") || normalizedHeader.includes("date") || header === "han_nop") {
       columnRange.format.numberFormat = "yyyy-mm-dd";
     }
     if (header.includes("gia") || header.includes("doanh_so") || header.includes("target_sales")) {
@@ -232,6 +243,13 @@ function writeTableSheet(workbook, sheetDef) {
     if (header.startsWith("id_") || header === "email" || header === "thang_nam") {
       columnRange.format.numberFormat = "@";
     }
+    if (["NV kinh doanh", "Mã Kh", "Số Chứng từ ngoại", "Mã HH"].includes(header)) {
+      columnRange.format.numberFormat = "@";
+    }
+    if (header === "Số Lượng") columnRange.format.numberFormat = "#,##0.###";
+    if (header === "Đơn giá") columnRange.format.numberFormat = "#,##0.000";
+    if (["Doanh thu", "DOANH SỐ"].includes(header)) columnRange.format.numberFormat = "#,##0.00";
+    if (header === "Hệ số") columnRange.format.numberFormat = "0.####";
     if (sheetDef.validations?.[header]) {
       columnRange.dataValidation = { rule: { type: "list", values: sheetDef.validations[header] } };
     }
@@ -239,6 +257,13 @@ function writeTableSheet(workbook, sheetDef) {
 
   sheet.freezePanes.freezeRows(5);
   sheet.getUsedRange().format.autofitColumns();
+  if (sheetDef.name === "data_sale_transactions") {
+    const widths = [20, 14, 24, 14, 16, 9, 9, 13, 34, 15, 20, 13, 36, 10, 14, 16, 16, 11, 16];
+    widths.forEach((width, index) => {
+      sheet.getRangeByIndexes(0, index, 50, 1).format.columnWidth = width;
+    });
+    sheet.getRangeByIndexes(1, 0, 1, sheetDef.headers.length).format.rowHeight = 32;
+  }
   sheet.getRangeByIndexes(0, 0, 1, sheetDef.headers.length).format.rowHeight = 28;
 }
 
@@ -246,6 +271,15 @@ async function main() {
   await fs.mkdir(repoTemplateDir, { recursive: true });
   await fs.mkdir(csvDir, { recursive: true });
   await fs.mkdir(outputDir, { recursive: true });
+
+  const existingTemplate = path.join(repoTemplateDir, "cpc1hn_data_import_template.xlsx");
+  try {
+    const existingWorkbook = await SpreadsheetFile.importXlsx(await FileBlob.load(existingTemplate));
+    const existingPreview = await existingWorkbook.render({ sheetName: "tb_doanh_thu", autoCrop: "all", scale: 1, format: "png" });
+    await fs.writeFile(path.join(outputDir, "before-tb_doanh_thu.png"), new Uint8Array(await existingPreview.arrayBuffer()));
+  } catch (error) {
+    console.warn(`Skipped existing workbook preview: ${error.message}`);
+  }
 
   const workbook = Workbook.create();
   const readme = workbook.worksheets.add("README");
@@ -304,7 +338,16 @@ async function main() {
   });
   console.log(errorScan.ndjson);
 
-  for (const sheetName of ["README", "tb_nhan_su", "tb_khach_hang", "tb_doanh_thu"]) {
+  const dataSaleCheck = await workbook.inspect({
+    kind: "table",
+    range: "data_sale_transactions!A1:S7",
+    maxChars: 6000,
+    tableMaxRows: 7,
+    tableMaxCols: 19
+  });
+  console.log(dataSaleCheck.ndjson);
+
+  for (const sheetName of ["README", "Codebook", ...sheets.map((sheet) => sheet.name)]) {
     const preview = await workbook.render({ sheetName, autoCrop: "all", scale: 1, format: "png" });
     await fs.writeFile(path.join(outputDir, `${sheetName}.png`), new Uint8Array(await preview.arrayBuffer()));
   }
@@ -337,7 +380,7 @@ async function main() {
     "4. `tb_san_pham`",
     "5. `tb_khach_hang`",
     "6. `employee_customers`",
-    "7. `tb_ke_don`, `tb_doanh_thu`, `tb_thau`, `daily_reports`, `kpi_targets`",
+    "7. `tb_ke_don`, `tb_doanh_thu`, `data_sale_transactions`, `tb_thau`, `daily_reports`, `kpi_targets`",
     "",
     "## Quy tắc",
     "",
@@ -345,6 +388,7 @@ async function main() {
     "- ID giữ dạng text.",
     "- Ngày dùng `yyyy-mm-dd`.",
     "- Tháng dùng `yyyy-mm`.",
+    "- `data_sale_transactions` giữ nguyên 19 cột nguồn; mã NV kinh doanh phải là text để giữ số 0 đầu.",
     "- Tiền và số lượng nhập số, không nhập ký hiệu VND.",
     "- Không bỏ qua hai bảng phân quyền `employee_territories` và `employee_customers`."
   ].join("\n");
