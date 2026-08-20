@@ -20,7 +20,7 @@ async function requireUser(event) {
     throw error;
   }
 
-  const data = await loadData();
+  const data = await loadData(event);
   const tokenHash = hashToken(token);
   const session = (data.sessions || []).find((item) => item.tokenHash === tokenHash && new Date(item.expiresAt).getTime() > Date.now());
   if (!session) {

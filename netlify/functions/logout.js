@@ -14,10 +14,10 @@ exports.handler = async (event) => {
   try {
     const token = getBearerToken(event);
     if (token) {
-      const data = await loadData();
+      const data = await loadData(event);
       const tokenHash = hashToken(token);
       data.sessions = data.sessions.filter((session) => session.tokenHash !== tokenHash);
-      await saveData(data);
+      await saveData(data, event);
     }
     return json(200, { ok: true });
   } catch (error) {

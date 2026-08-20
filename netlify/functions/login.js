@@ -22,7 +22,7 @@ exports.handler = async (event) => {
     const body = parseBody(event);
     const username = String(body.username || "").trim();
     const password = String(body.password || "");
-    const data = await loadData();
+    const data = await loadData(event);
     const credential = data.credentials.find((item) => item.username === username);
     const employee = credential && data.employees.find((item) => item.id === credential.employeeId && item.status !== "Inactive");
 
@@ -36,7 +36,7 @@ exports.handler = async (event) => {
       employeeId: employee.id,
       expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
     });
-    await saveData(data);
+    await saveData(data, event);
 
     const user = withTerritories(data, employee);
     return json(200, {

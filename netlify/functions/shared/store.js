@@ -1,4 +1,4 @@
-const { getStore } = require("@netlify/blobs");
+const { connectLambda, getStore } = require("@netlify/blobs");
 
 const DATA_KEY = "app-data";
 
@@ -82,7 +82,12 @@ function isExpired(session) {
   return !session.expiresAt || new Date(session.expiresAt).getTime() <= Date.now();
 }
 
-async function loadData() {
+function connectEvent(event) {
+  if (event) connectLambda(event);
+}
+
+async function loadData(event) {
+  connectEvent(event);
   const store = getStore("cpc1hn-tdv-management");
   const data = await store.get(DATA_KEY, { type: "json" });
   if (data) {
@@ -95,7 +100,8 @@ async function loadData() {
   return initial;
 }
 
-async function saveData(data) {
+async function saveData(data, event) {
+  connectEvent(event);
   const store = getStore("cpc1hn-tdv-management");
   data.sessions = (data.sessions || []).filter((session) => !isExpired(session));
   await store.setJSON(DATA_KEY, data);
