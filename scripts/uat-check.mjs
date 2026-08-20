@@ -163,6 +163,11 @@ check("UAT-AUTO-09", "Netlify functions can be loaded by Node", () => {
   }
 });
 
+check("UAT-AUTO-10", "Async forms keep stable form references before reset", () => {
+  const app = read("src/app.js");
+  assert(!app.includes("event.currentTarget.reset()"), "Forms must not reset through event.currentTarget after async work");
+});
+
 const failed = checks.filter((item) => item.status === "FAIL");
 for (const item of checks) {
   const detail = item.detail ? ` - ${item.detail}` : "";

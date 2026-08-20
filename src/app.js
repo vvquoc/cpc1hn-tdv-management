@@ -398,7 +398,8 @@ function renderAdmin() {
 function bindForms() {
   document.querySelector("#loginForm").addEventListener("submit", async (event) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const target = event.currentTarget;
+    const form = new FormData(target);
     document.querySelector("#loginMessage").textContent = "";
 
     try {
@@ -417,7 +418,7 @@ function bindForms() {
       authUser = payload.user;
       localStorage.setItem(STORAGE_TOKEN_KEY, authToken);
       localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(authUser));
-      event.currentTarget.reset();
+      target.reset();
       await loadData();
     } catch (error) {
       showLogin(error.message);
@@ -442,7 +443,8 @@ function bindForms() {
     event.preventDefault();
     if (!apiReady) return showNotice("Database chưa sẵn sàng, chưa thể ghi kê đơn.");
 
-    const form = new FormData(event.currentTarget);
+    const target = event.currentTarget;
+    const form = new FormData(target);
     try {
       await api("/api/v1/prescriptions", {
         method: "POST",
@@ -453,7 +455,7 @@ function bindForms() {
           quantity: Number(form.get("quantity"))
         })
       });
-      event.currentTarget.reset();
+      target.reset();
       setDefaultDates();
       await loadData();
     } catch (error) {
@@ -465,7 +467,8 @@ function bindForms() {
     event.preventDefault();
     if (!apiReady) return showNotice("Database chưa sẵn sàng, chưa thể ghi doanh số.");
 
-    const form = new FormData(event.currentTarget);
+    const target = event.currentTarget;
+    const form = new FormData(target);
     try {
       await api("/api/v1/sales", {
         method: "POST",
@@ -476,7 +479,7 @@ function bindForms() {
           amount: Number(form.get("amount"))
         })
       });
-      event.currentTarget.reset();
+      target.reset();
       setDefaultDates();
       await loadData();
     } catch (error) {
@@ -488,12 +491,13 @@ function bindForms() {
     event.preventDefault();
     if (!apiReady) return showNotice("Database chưa sẵn sàng, chưa thể lưu gói thầu.");
 
+    const target = event.currentTarget;
     try {
       await api("/api/v1/tenders", {
         method: "POST",
-        body: JSON.stringify(getFormObject(event.currentTarget))
+        body: JSON.stringify(getFormObject(target))
       });
-      event.currentTarget.reset();
+      target.reset();
       await loadData();
     } catch (error) {
       showNotice(error.message);
@@ -502,9 +506,10 @@ function bindForms() {
 
   document.querySelector("#employeeForm").addEventListener("submit", async (event) => {
     event.preventDefault();
+    const target = event.currentTarget;
     try {
-      await postAdmin("employee", getFormObject(event.currentTarget));
-      event.currentTarget.reset();
+      await postAdmin("employee", getFormObject(target));
+      target.reset();
     } catch (error) {
       showNotice(error.message);
     }
@@ -512,9 +517,10 @@ function bindForms() {
 
   document.querySelector("#territoryForm").addEventListener("submit", async (event) => {
     event.preventDefault();
+    const target = event.currentTarget;
     try {
-      await postAdmin("territory", getFormObject(event.currentTarget));
-      event.currentTarget.reset();
+      await postAdmin("territory", getFormObject(target));
+      target.reset();
     } catch (error) {
       showNotice(error.message);
     }
@@ -522,9 +528,10 @@ function bindForms() {
 
   document.querySelector("#productForm").addEventListener("submit", async (event) => {
     event.preventDefault();
+    const target = event.currentTarget;
     try {
-      await postAdmin("product", getFormObject(event.currentTarget));
-      event.currentTarget.reset();
+      await postAdmin("product", getFormObject(target));
+      target.reset();
     } catch (error) {
       showNotice(error.message);
     }
@@ -532,9 +539,10 @@ function bindForms() {
 
   document.querySelector("#customerForm").addEventListener("submit", async (event) => {
     event.preventDefault();
+    const target = event.currentTarget;
     try {
-      await postAdmin("customer", getFormObject(event.currentTarget));
-      event.currentTarget.reset();
+      await postAdmin("customer", getFormObject(target));
+      target.reset();
     } catch (error) {
       showNotice(error.message);
     }
@@ -542,9 +550,10 @@ function bindForms() {
 
   document.querySelector("#territoryAssignForm").addEventListener("submit", async (event) => {
     event.preventDefault();
+    const target = event.currentTarget;
     try {
-      await postAdmin("employee_territory", getFormObject(event.currentTarget));
-      event.currentTarget.reset();
+      await postAdmin("employee_territory", getFormObject(target));
+      target.reset();
     } catch (error) {
       showNotice(error.message);
     }
@@ -552,9 +561,10 @@ function bindForms() {
 
   document.querySelector("#customerAssignForm").addEventListener("submit", async (event) => {
     event.preventDefault();
+    const target = event.currentTarget;
     try {
-      await postAdmin("employee_customer", getFormObject(event.currentTarget));
-      event.currentTarget.reset();
+      await postAdmin("employee_customer", getFormObject(target));
+      target.reset();
     } catch (error) {
       showNotice(error.message);
     }
