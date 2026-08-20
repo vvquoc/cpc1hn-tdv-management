@@ -44,13 +44,26 @@ await request("/api/v1/sales", { token: deviceB.token, method: "POST", body: { p
 await request("/api/v1/tenders", { token: deviceA.token, method: "POST", body: { id: "UAT-E2E-GT", customerId: "UAT-E2E-KH", productId: "UAT-E2E-SP", status: "DangLamHoSo", quantity: 10, bidPrice: 900 } });
 
 await request("/api/v1/data-transfer", { token, method: "POST", body: { resource: "products", rows: [{ id_san_pham: "UAT-IMPORT-SP", ten_san_pham: "Sản phẩm import UAT", dang_bao_che: "Khac", mo_ta_dang_bao_che: "Import", gia_ke_don: "2000", trang_thai: "Active" }] } });
-const finalData = (await request("/api/v1/bootstrap-data", { token })).payload;
-if (!finalData.products.some((item) => item.id === "UAT-IMPORT-SP")) throw new Error("Imported product is missing after reload");
-if (!finalData.prescriptions.some((item) => item.employeeId === "UAT-E2E-NV" && item.customerId === "UAT-E2E-KH")) throw new Error("Employee prescription was not persisted");
-if (!finalData.sales.some((item) => item.employeeId === "UAT-E2E-NV" && item.customerId === "UAT-E2E-KH")) throw new Error("Employee sale was not persisted");
-if (!finalData.tenders.some((item) => item.id === "UAT-E2E-GT" && item.employeeId === "UAT-E2E-NV")) throw new Error("Employee tender was not persisted");
+const period = new Date().toISOString().slice(0, 7);
+const [finalData, finalAdmin, prescriptions, sales, tenders, dashboard] = await Promise.all([
+  request("/api/v1/bootstrap-data", { token }),
+  request("/api/v1/admin-data", { token }),
+  request(`/api/v1/prescriptions?period=${period}&search=Kh%C3%A1ch%20h%C3%A0ng%20UAT&page=1&pageSize=20`, { token }),
+  request(`/api/v1/sales?period=${period}&search=Kh%C3%A1ch%20h%C3%A0ng%20UAT&page=1&pageSize=20`, { token }),
+  request("/api/v1/tenders?search=UAT-E2E-GT&page=1&pageSize=20", { token }),
+  request(`/api/v1/dashboard?period=${period}`, { token })
+]);
+if (!finalData.payload.products.some((item) => item.id === "UAT-IMPORT-SP")) throw new Error("Imported product is missing after reload");
+if (!finalAdmin.payload.accounts.some((item) => item.employeeId === "UAT-E2E-NV" && item.username === "uat_employee")) throw new Error("Employee login account was not persisted");
+if (!prescriptions.payload.items.some((item) => item.employeeId === "UAT-E2E-NV" && item.customerId === "UAT-E2E-KH")) throw new Error("Employee prescription was not persisted in the paginated report");
+if (!sales.payload.items.some((item) => item.employeeId === "UAT-E2E-NV" && item.customerId === "UAT-E2E-KH" && item.amount === 250000)) throw new Error("Employee sale was not persisted in the paginated report");
+if (!tenders.payload.items.some((item) => item.id === "UAT-E2E-GT" && item.employeeId === "UAT-E2E-NV")) throw new Error("Employee tender was not persisted in the paginated report");
+if (dashboard.payload.metrics.sales < 250000 || dashboard.payload.metrics.prescriptionQuantity < 2 || dashboard.payload.metrics.openTenders < 1) {
+  throw new Error(`Dashboard did not reconcile persisted operations: ${JSON.stringify(dashboard.payload.metrics)}`);
+}
 
 console.log(JSON.stringify({
   managerLogin: "PASS", manualCrud: "PASS", accountWithoutEmail: "PASS", independentEmployeeLogins: 2,
-  employeeWrites: ["prescription", "sale", "tender"], standardImport: "PASS", persistedAfterReload: "PASS"
+  employeeWrites: ["prescription", "sale", "tender"], standardImport: "PASS", persistedAfterReload: "PASS",
+  paginatedReports: "PASS", dashboardReconciliation: "PASS"
 }));
