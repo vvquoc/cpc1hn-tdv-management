@@ -22,6 +22,7 @@
           <a href="#sales">Doanh số</a>
           <a href="#tender">Thầu</a>
           <a href="#alerts">Cảnh báo</a>
+          <a href="#admin" data-admin-only>Quản trị</a>
         </nav>
       </aside>
 
@@ -120,6 +121,23 @@
           <div class="section-heading">
             <h2>Tiến độ thầu</h2>
           </div>
+          <form id="tenderForm" class="form-grid">
+            <label>Mã gói thầu<input name="id" placeholder="GT-DN-2026-02" required /></label>
+            <label>Khách hàng<select name="customerId" required></select></label>
+            <label>Sản phẩm<select name="productId" required></select></label>
+            <label>Trạng thái
+              <select name="status" required>
+                <option value="DangLamHoSo">Đang làm hồ sơ</option>
+                <option value="ChoKetQua">Chờ kết quả</option>
+                <option value="TrungThau">Trúng thầu</option>
+                <option value="TruotThau">Trượt thầu</option>
+              </select>
+            </label>
+            <label>Hạn nộp<input name="dueDate" type="date" /></label>
+            <label>Số lượng<input name="quantity" type="number" min="0" value="0" /></label>
+            <label>Giá dự thầu<input name="bidPrice" type="number" min="0" step="1000" value="0" /></label>
+            <button type="submit">Lưu gói thầu</button>
+          </form>
           <div class="table-wrap">
             <table>
               <thead>
@@ -134,6 +152,124 @@
               </thead>
               <tbody id="tenderRows"></tbody>
             </table>
+          </div>
+        </section>
+
+        <section id="admin" class="section" data-admin-only>
+          <div class="section-heading">
+            <h2>Quản trị dữ liệu</h2>
+            <span>Admin/Manager thêm, sửa, ngừng hoạt động dữ liệu thật ngay trên website.</span>
+          </div>
+
+          <div class="admin-grid">
+            <form id="employeeForm" class="admin-form">
+              <h3>Nhân sự / tài khoản</h3>
+              <label>Mã nhân viên<input name="id" placeholder="NV-DN-02" required /></label>
+              <label>Họ tên<input name="name" required /></label>
+              <label>Email đăng nhập<input name="email" type="email" required /></label>
+              <label>Vai trò
+                <select name="role" required>
+                  <option value="MR">MR</option>
+                  <option value="Supervisor">Supervisor</option>
+                  <option value="Manager">Manager</option>
+                  <option value="Admin">Admin</option>
+                </select>
+              </label>
+              <label>Trạng thái
+                <select name="status">
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </label>
+              <button type="submit">Lưu nhân sự</button>
+            </form>
+
+            <form id="territoryForm" class="admin-form">
+              <h3>Địa bàn</h3>
+              <label>Mã địa bàn<input name="id" placeholder="DB_HUE" required /></label>
+              <label>Tên địa bàn<input name="name" required /></label>
+              <label>Khu vực<input name="region" placeholder="Miền Trung" required /></label>
+              <button type="submit">Lưu địa bàn</button>
+            </form>
+
+            <form id="productForm" class="admin-form">
+              <h3>Sản phẩm</h3>
+              <label>Mã sản phẩm<input name="id" placeholder="SP_NEW" required /></label>
+              <label>Tên sản phẩm<input name="name" required /></label>
+              <label>Hoạt chất<input name="activeIngredient" /></label>
+              <label>Dạng bào chế
+                <select name="dosageCode" required>
+                  <option value="BFS">BFS</option>
+                  <option value="BOV">BOV</option>
+                  <option value="MDI">MDI</option>
+                  <option value="VienDatDoKhuon">Viên đặt đổ khuôn</option>
+                  <option value="Khac">Khác</option>
+                </select>
+              </label>
+              <label>Mô tả dạng bào chế<input name="dosageForm" required /></label>
+              <label>Quy cách<input name="packageSpec" /></label>
+              <label>Giá kê đơn<input name="prescriptionPrice" type="number" min="0" step="1000" required /></label>
+              <label>Trạng thái
+                <select name="status">
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </label>
+              <button type="submit">Lưu sản phẩm</button>
+            </form>
+
+            <form id="customerForm" class="admin-form">
+              <h3>Khách hàng</h3>
+              <label>Mã khách hàng<input name="id" placeholder="KH_PM_DN_02" required /></label>
+              <label>Tên khách hàng<input name="name" required /></label>
+              <label>Loại
+                <select name="type" required>
+                  <option value="PhongMachTu">Phòng mạch tư</option>
+                  <option value="BenhVien">Bệnh viện</option>
+                  <option value="SoYTe">Sở Y tế</option>
+                </select>
+              </label>
+              <label>Địa bàn<select name="territoryId" required></select></label>
+              <label>Địa chỉ<input name="address" /></label>
+              <label>Điện thoại<input name="phone" /></label>
+              <label>Trạng thái
+                <select name="status">
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </label>
+              <button type="submit">Lưu khách hàng</button>
+            </form>
+
+            <form id="territoryAssignForm" class="admin-form">
+              <h3>Phân địa bàn</h3>
+              <label>Nhân sự<select name="employeeId" required></select></label>
+              <label>Địa bàn<select name="territoryId" required></select></label>
+              <label class="checkbox-label"><input name="isPrimary" type="checkbox" /> Địa bàn chính</label>
+              <button type="submit">Gán địa bàn</button>
+            </form>
+
+            <form id="customerAssignForm" class="admin-form">
+              <h3>Phân khách hàng</h3>
+              <label>Nhân sự<select name="employeeId" required></select></label>
+              <label>Khách hàng<select name="customerId" required></select></label>
+              <button type="submit">Gán khách hàng</button>
+            </form>
+          </div>
+
+          <div class="admin-lists">
+            <div>
+              <h3>Nhân sự hiện có</h3>
+              <ul id="employeeAdminList" class="list"></ul>
+            </div>
+            <div>
+              <h3>Sản phẩm hiện có</h3>
+              <ul id="productAdminList" class="list"></ul>
+            </div>
+            <div>
+              <h3>Khách hàng hiện có</h3>
+              <ul id="customerAdminList" class="list"></ul>
+            </div>
           </div>
         </section>
 

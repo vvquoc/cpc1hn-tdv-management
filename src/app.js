@@ -20,6 +20,11 @@ function activeEmployee() {
   return state.employees.find((item) => item.email === activeEmail()) || state.activeUser || state.employees[0];
 }
 
+function canAdmin() {
+  const employee = activeEmployee();
+  return employee && (employee.role === "Admin" || employee.role === "Manager");
+}
+
 async function api(path, options = {}) {
   const response = await fetch(path, {
     ...options,
@@ -65,6 +70,14 @@ function setOptions(select, items, labelFor) {
   select.innerHTML = items.map((item) => `<option value="${item.id || item.email}">${labelFor(item)}</option>`).join("");
 }
 
+function setEmailOptions() {
+  const select = document.querySelector("#activeUser");
+  const current = select.value || localStorage.getItem(STORAGE_EMAIL_KEY) || demoUsers[0].email;
+  const users = (state.employees && state.employees.length ? state.employees : demoUsers).filter((employee) => employee.status !== "Inactive");
+  select.innerHTML = users.map((employee) => `<option value="${employee.email}">${employee.name} · ${employee.role}</option>`).join("");
+  select.value = users.some((employee) => employee.email === current) ? current : users[0]?.email || "";
+}
+
 function showNotice(message) {
   let notice = document.querySelector("#notice");
   if (!notice) {
@@ -92,8 +105,11 @@ async function loadData() {
 }
 
 function render() {
+  setEmailOptions();
   const employee = activeEmployee();
   const customers = state.customers || [];
+  const activeCustomers = customers.filter((customer) => customer.status !== "Inactive");
+  const activeProducts = (state.products || []).filter((product) => product.status !== "Inactive");
   const customerIds = customers.map((item) => item.id);
   const prescriptions = (state.prescriptions || []).filter((item) => customerIds.includes(item.customerId));
   const sales = (state.sales || []).filter((item) => customerIds.includes(item.customerId));
@@ -108,11 +124,11 @@ function render() {
   document.querySelector("#metricTenders").textContent = tenders.filter((item) => item.status !== "TrungThau" && item.status !== "TruotThau").length;
   document.querySelector("#metricLostSales").textContent = lostSales.length;
 
-  document.querySelectorAll("select[name='customerId']").forEach((select) => {
-    setOptions(select, customers, (customer) => customer.name);
+  document.querySelectorAll("form:not(#customerAssignForm) select[name='customerId']").forEach((select) => {
+    setOptions(select, activeCustomers, (customer) => customer.name);
   });
   document.querySelectorAll("select[name='productId']").forEach((select) => {
-    setOptions(select, state.products || [], (product) => `${product.name} · ${product.dosageForm}`);
+    setOptions(select, activeProducts, (product) => `${product.name} · ${product.dosageForm}`);
   });
 
   document.querySelector("#prescriptionRows").innerHTML = prescriptions
@@ -148,6 +164,7 @@ function render() {
     .join("");
 
   renderAlerts(lostSales, []);
+  renderAdmin();
 }
 
 function renderAlerts(lostSales, reminders) {
@@ -163,6 +180,92 @@ function renderAlerts(lostSales, reminders) {
   document.querySelector("#reminderList").innerHTML = fallbackReminders.length
     ? fallbackReminders.map((item) => `<li><strong>${item.employeeName || item.name}</strong><br />${item.message || `Chưa có báo cáo ngày ${today}.`}</li>`).join("")
     : "<li>Tất cả TDV trong phạm vi đã báo cáo hôm nay.</li>";
+}
+
+function getFormObject(form) {
+  const data = Object.fromEntries(new FormData(form).entries());
+  form.querySelectorAll("input[type='checkbox']").forEach((input) => {
+    data[input.name] = input.checked;
+  });
+  return data;
+}
+
+async function postAdmin(resource, data, action = "upsert") {
+  await api("/api/v1/admin-data", {
+    method: "POST",
+    body: JSON.stringify({ resource, action, data })
+  });
+  await loadData();
+}
+
+function fillForm(formId, data) {
+  const form = document.querySelector(formId);
+  Object.entries(data).forEach(([key, value]) => {
+    const field = form.elements[key];
+    if (!field) return;
+    if (field.type === "checkbox") {
+      field.checked = Boolean(value);
+    } else {
+      field.value = value ?? "";
+    }
+  });
+}
+
+function renderAdmin() {
+  const adminVisible = canAdmin();
+  document.querySelectorAll("[data-admin-only]").forEach((element) => {
+    element.hidden = !adminVisible;
+  });
+  if (!adminVisible) return;
+
+  const employees = state.employees || [];
+  const territories = state.territories || [];
+  const products = state.products || [];
+  const customers = state.customers || [];
+
+  document.querySelectorAll("#territoryAssignForm select[name='employeeId'], #customerAssignForm select[name='employeeId']").forEach((select) => {
+    setOptions(select, employees, (employee) => `${employee.name} · ${employee.role}`);
+  });
+  document.querySelectorAll("#customerForm select[name='territoryId'], #territoryAssignForm select[name='territoryId']").forEach((select) => {
+    setOptions(select, territories, (territory) => territory.name);
+  });
+  setOptions(document.querySelector("#customerAssignForm select[name='customerId']"), customers, (customer) => customer.name);
+
+  document.querySelector("#employeeAdminList").innerHTML = employees
+    .map((employee) => `
+      <li>
+        <strong>${employee.name}</strong><br />
+        ${employee.id} · ${employee.email} · ${employee.role} · ${employee.status || "Active"}
+        <div class="inline-actions">
+          <button class="secondary-button" data-edit-employee="${employee.id}">Sửa</button>
+          <button class="danger-button" data-deactivate-employee="${employee.id}">Ngừng hoạt động</button>
+        </div>
+      </li>`)
+    .join("");
+
+  document.querySelector("#productAdminList").innerHTML = products
+    .map((product) => `
+      <li>
+        <strong>${product.name}</strong><br />
+        ${product.id} · ${product.dosageForm} · ${currency.format(product.prescriptionPrice || 0)} · ${product.status || "Active"}
+        <div class="inline-actions">
+          <button class="secondary-button" data-edit-product="${product.id}">Sửa</button>
+          <button class="danger-button" data-deactivate-product="${product.id}">Ngừng hoạt động</button>
+        </div>
+      </li>`)
+    .join("");
+
+  document.querySelector("#customerAdminList").innerHTML = customers
+    .map((customer) => `
+      <li>
+        <strong>${customer.name}</strong><br />
+        ${customer.id} · ${customer.type} · ${customer.territoryId} · ${customer.status || "Active"}
+        <div class="inline-actions">
+          <button class="secondary-button" data-edit-customer="${customer.id}">Sửa</button>
+          <button class="danger-button" data-deactivate-customer="${customer.id}">Ngừng hoạt động</button>
+        </div>
+      </li>`)
+    .join("");
 }
 
 function bindForms() {
@@ -207,6 +310,112 @@ function bindForms() {
       event.currentTarget.reset();
       setDefaultDates();
       await loadData();
+    } catch (error) {
+      showNotice(error.message);
+    }
+  });
+
+  document.querySelector("#tenderForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!apiReady) return showNotice("Database chưa sẵn sàng, chưa thể lưu gói thầu.");
+
+    try {
+      await api("/api/v1/tenders", {
+        method: "POST",
+        body: JSON.stringify(getFormObject(event.currentTarget))
+      });
+      event.currentTarget.reset();
+      await loadData();
+    } catch (error) {
+      showNotice(error.message);
+    }
+  });
+
+  document.querySelector("#employeeForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      await postAdmin("employee", getFormObject(event.currentTarget));
+      event.currentTarget.reset();
+    } catch (error) {
+      showNotice(error.message);
+    }
+  });
+
+  document.querySelector("#territoryForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      await postAdmin("territory", getFormObject(event.currentTarget));
+      event.currentTarget.reset();
+    } catch (error) {
+      showNotice(error.message);
+    }
+  });
+
+  document.querySelector("#productForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      await postAdmin("product", getFormObject(event.currentTarget));
+      event.currentTarget.reset();
+    } catch (error) {
+      showNotice(error.message);
+    }
+  });
+
+  document.querySelector("#customerForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      await postAdmin("customer", getFormObject(event.currentTarget));
+      event.currentTarget.reset();
+    } catch (error) {
+      showNotice(error.message);
+    }
+  });
+
+  document.querySelector("#territoryAssignForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      await postAdmin("employee_territory", getFormObject(event.currentTarget));
+      event.currentTarget.reset();
+    } catch (error) {
+      showNotice(error.message);
+    }
+  });
+
+  document.querySelector("#customerAssignForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      await postAdmin("employee_customer", getFormObject(event.currentTarget));
+      event.currentTarget.reset();
+    } catch (error) {
+      showNotice(error.message);
+    }
+  });
+
+  document.querySelector("#admin").addEventListener("click", async (event) => {
+    const button = event.target.closest("button");
+    if (!button) return;
+
+    const employeeId = button.dataset.editEmployee || button.dataset.deactivateEmployee;
+    const productId = button.dataset.editProduct || button.dataset.deactivateProduct;
+    const customerId = button.dataset.editCustomer || button.dataset.deactivateCustomer;
+
+    try {
+      if (button.dataset.editEmployee) {
+        const employee = byId(state.employees, employeeId);
+        fillForm("#employeeForm", employee);
+      } else if (button.dataset.deactivateEmployee) {
+        await postAdmin("employee", { id: employeeId }, "deactivate");
+      } else if (button.dataset.editProduct) {
+        const product = byId(state.products, productId);
+        fillForm("#productForm", product);
+      } else if (button.dataset.deactivateProduct) {
+        await postAdmin("product", { id: productId }, "deactivate");
+      } else if (button.dataset.editCustomer) {
+        const customer = byId(state.customers, customerId);
+        fillForm("#customerForm", customer);
+      } else if (button.dataset.deactivateCustomer) {
+        await postAdmin("customer", { id: customerId }, "deactivate");
+      }
     } catch (error) {
       showNotice(error.message);
     }

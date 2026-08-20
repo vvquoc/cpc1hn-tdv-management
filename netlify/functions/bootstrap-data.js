@@ -17,27 +17,29 @@ exports.handler = async (event) => {
       ),
       query(
         `select ns.id_nhan_vien as id, ns.ten_nhan_vien as name, ns.email, ns.chuc_vu as role,
+                ns.trang_thai as status,
                 coalesce(array_agg(et.id_dia_ban order by et.id_dia_ban) filter (where et.id_dia_ban is not null), '{}') as "territoryIds"
          from tb_nhan_su ns
          left join employee_territories et on et.id_nhan_vien = ns.id_nhan_vien
-         where ns.trang_thai = 'Active'
          group by ns.id_nhan_vien
          order by ns.ten_nhan_vien`
       ),
       query(
-        `select id_san_pham as id, ten_san_pham as name, mo_ta_dang_bao_che as "dosageForm",
-                gia_ke_don::float as "prescriptionPrice"
+        `select id_san_pham as id, ten_san_pham as name, hoat_chat as "activeIngredient",
+                dang_bao_che as "dosageCode", mo_ta_dang_bao_che as "dosageForm",
+                quy_cach as "packageSpec", gia_ke_don::float as "prescriptionPrice",
+                trang_thai as status
          from tb_san_pham
-         where trang_thai = 'Active'
          order by ten_san_pham`
       ),
       query(
         `select kh.id_khach_hang as id, kh.ten_khach_hang as name, kh.loai_khach_hang as type,
                 kh.id_dia_ban as "territoryId",
+                kh.dia_chi as address, kh.dien_thoai as phone, kh.trang_thai as status,
                 coalesce(ec.id_nhan_vien, '') as "ownerId"
          from tb_khach_hang kh
          left join employee_customers ec on ec.id_khach_hang = kh.id_khach_hang
-         where kh.trang_thai = 'Active' and ${scope.clause}
+         where ${scope.clause}
          order by kh.ten_khach_hang`,
         scope.params
       ),

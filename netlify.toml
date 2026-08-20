@@ -40,8 +40,8 @@
   status = 200
 
 [[redirects]]
-  from = "/api/v1/import/google-sheet"
-  to = "/.netlify/functions/import-google-sheet"
+  from = "/api/v1/admin-data"
+  to = "/.netlify/functions/admin-data"
   status = 200
 
 [[redirects]]
