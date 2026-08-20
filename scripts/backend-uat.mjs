@@ -62,6 +62,15 @@ const migration = source("netlify/database/migrations/009_lightweight_crud_auth.
 check("BACKEND-07 makes Email optional", () => assert(migration.includes("email drop not null"), "Email remains mandatory"));
 check("BACKEND-08 enforces one login per employee", () => assert(migration.includes("uq_auth_credentials_employee"), "credential uniqueness missing"));
 
+const cleanup = source("netlify/database/migrations/010_remove_demo_uat_data.sql");
+check("BACKEND cleanup removes only known demo and UAT IDs", () => {
+  assert(cleanup.includes("UAT-E2E-NV") && cleanup.includes("NV-DN-01"), "known demo IDs missing");
+  assert(!cleanup.includes("SALE_KH_") && !cleanup.includes("SALE_SP_"), "real DATA SALE IDs must be preserved");
+});
+
+const store = source("netlify/functions/shared/store.js");
+check("BACKEND reports do not truncate stored data", () => assert(!/order by[^\n]+limit\s+\d+/i.test(store), "report query still has a fixed row limit"));
+
 const admin = source("netlify/functions/admin-data.js");
 check("BACKEND-09 admin CRUD uses direct database writes", () => {
   assert(admin.includes("requireDatabaseUser") && admin.includes("getPool"), "direct database path missing");

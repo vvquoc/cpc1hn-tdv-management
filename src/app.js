@@ -598,6 +598,8 @@ function bindForms() {
     try {
       await postAdmin("employee", getFormObject(target));
       target.reset();
+      target.elements.password.required = true;
+      target.elements.password.placeholder = "Tối thiểu 8 ký tự";
     } catch (error) {
       showNotice(error.message);
     }
@@ -676,6 +678,8 @@ function bindForms() {
         const account = (state.accounts || []).find((item) => item.employeeId === employeeId);
         document.querySelector("#employeeForm [name='username']").value = account?.username || "";
         document.querySelector("#employeeForm [name='password']").value = "";
+        document.querySelector("#employeeForm [name='password']").required = false;
+        document.querySelector("#employeeForm [name='password']").placeholder = "Để trống nếu không đổi";
       } else if (button.dataset.deactivateEmployee) {
         await postAdmin("employee", { id: employeeId }, "deactivate");
       } else if (button.dataset.editProduct) {
@@ -703,6 +707,13 @@ function bindForms() {
     } catch (error) {
       showNotice(error.message);
     }
+  });
+
+  document.querySelector("#employeeForm").addEventListener("reset", (event) => {
+    setTimeout(() => {
+      event.currentTarget.elements.password.required = true;
+      event.currentTarget.elements.password.placeholder = "Tối thiểu 8 ký tự";
+    }, 0);
   });
 
   document.querySelector("#exportData").addEventListener("click", async () => {

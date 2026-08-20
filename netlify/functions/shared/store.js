@@ -24,16 +24,16 @@ async function loadData() {
     pool.query("select id_khach_hang, ten_khach_hang, loai_khach_hang, dia_chi, dien_thoai, id_dia_ban, trang_thai, ma_khach_hang_sale, nhom_khach_hang_sale from tb_khach_hang order by ten_khach_hang"),
     pool.query("select id_nhan_vien, id_dia_ban, is_primary from employee_territories"),
     pool.query("select id_nhan_vien, id_khach_hang from employee_customers"),
-    pool.query("select id_giao_dich, ngay_bao_cao, id_nhan_vien, id_khach_hang, id_san_pham, so_luong_ke_don, doanh_so_phat_sinh from tb_ke_don order by ngay_bao_cao desc limit 2000"),
-    pool.query("select id_doanh_thu, thang_nam, id_khach_hang, id_san_pham, id_nhan_vien, doanh_so_thuc from tb_doanh_thu order by thang_nam desc limit 5000"),
+    pool.query("select id_giao_dich, ngay_bao_cao, id_nhan_vien, id_khach_hang, id_san_pham, so_luong_ke_don, doanh_so_phat_sinh from tb_ke_don order by ngay_bao_cao desc"),
+    pool.query("select id_doanh_thu, thang_nam, id_khach_hang, id_san_pham, id_nhan_vien, doanh_so_thuc from tb_doanh_thu order by thang_nam desc"),
     pool.query(`select thang_nam, id_khach_hang, id_san_pham, id_nhan_vien, sum(tong_doanh_so) as doanh_so_thuc
       from vw_data_sale_monthly
       where id_khach_hang is not null and id_san_pham is not null and id_nhan_vien is not null
       group by thang_nam, id_khach_hang, id_san_pham, id_nhan_vien
-      order by thang_nam desc limit 10000`),
-    pool.query("select id_goi_thau, id_khach_hang, id_san_pham, so_luong_thau, gia_du_thau, trang_thai, id_nhan_vien, han_nop from tb_thau order by ngay_cap_nhat desc limit 2000"),
-    pool.query("select id, report_date, id_nhan_vien, summary, kpi_note from daily_reports order by report_date desc limit 2000"),
-    pool.query("select id, thang_nam, id_nhan_vien, id_dia_ban, id_san_pham, target_sales, target_prescriptions from kpi_targets order by thang_nam desc limit 2000"),
+      order by thang_nam desc`),
+    pool.query("select id_goi_thau, id_khach_hang, id_san_pham, so_luong_thau, gia_du_thau, trang_thai, id_nhan_vien, han_nop from tb_thau order by ngay_cap_nhat desc"),
+    pool.query("select id, report_date, id_nhan_vien, summary, kpi_note from daily_reports order by report_date desc"),
+    pool.query("select id, thang_nam, id_nhan_vien, id_dia_ban, id_san_pham, target_sales, target_prescriptions from kpi_targets order by thang_nam desc"),
     pool.query("select username, id_nhan_vien, password_salt, password_hash, iterations from auth_credentials")
   ]);
   const [revisionResult, territoriesResult, employeesResult, productsResult, customersResult, employeeTerritoriesResult, employeeCustomersResult, prescriptionsResult, manualSalesResult, dataSaleResult, tendersResult, dailyReportsResult, kpiTargetsResult, credentialsResult] = results;

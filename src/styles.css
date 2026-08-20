@@ -171,6 +171,12 @@ label {
 }
 
 .notice {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 1000;
+  width: min(420px, calc(100vw - 32px));
+  box-shadow: 0 8px 24px rgb(15 23 42 / 16%);
   border: 1px solid #f59e0b;
   border-radius: 8px;
   background: #fffbeb;
