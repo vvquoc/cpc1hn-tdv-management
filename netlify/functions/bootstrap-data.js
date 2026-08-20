@@ -1,5 +1,5 @@
 const { query } = require("./shared/db");
-const { requireUser, customerScopeSql } = require("./shared/auth");
+const { requireUser, customerScopeSql, isAdmin } = require("./shared/auth");
 const { handleError, json, methodNotAllowed } = require("./shared/http");
 
 exports.handler = async (event) => {
@@ -21,8 +21,10 @@ exports.handler = async (event) => {
                 coalesce(array_agg(et.id_dia_ban order by et.id_dia_ban) filter (where et.id_dia_ban is not null), '{}') as "territoryIds"
          from tb_nhan_su ns
          left join employee_territories et on et.id_nhan_vien = ns.id_nhan_vien
+         where ${isAdmin(user) ? "true" : "ns.id_nhan_vien = $1"}
          group by ns.id_nhan_vien
-         order by ns.ten_nhan_vien`
+         order by ns.ten_nhan_vien`,
+        isAdmin(user) ? [] : [user.id_nhan_vien]
       ),
       query(
         `select id_san_pham as id, ten_san_pham as name, hoat_chat as "activeIngredient",

@@ -10,13 +10,12 @@ Phạm vi: Website quản lý nội bộ cho trình dược viên, bỏ n8n kh�
 | Quản lý | Xem toàn bộ dữ liệu, thêm/sửa/xóa tài khoản, quản lý địa bàn, sản phẩm, khách hàng, phân công, import/export |
 | Nhân viên | Chỉ xem và nhập dữ liệu khách hàng được phân công |
 
-## 2. Dữ liệu demo dùng để test
+## 2. Tài khoản và dữ liệu dùng để test
 
 | Nhóm | Dữ liệu |
 | --- | --- |
-| Quản lý | `quanly@cpc1hn.vn` hoặc tài khoản quản lý đã có trong database |
-| Nhân viên Đà Nẵng | `nhanvien.danang@cpc1hn.vn` |
-| Nhân viên Quảng Nam | `nhanvien.quangnam@cpc1hn.vn` |
+| Quản lý | Tài khoản quản lý bàn giao |
+| Nhân viên | Do Quản lý tạo trong màn Quản trị |
 | Sản phẩm | Dữ liệu demo trong website và file `data-templates` |
 | Khách hàng | Bệnh viện, Sở Y tế, phòng mạch demo theo địa bàn |
 
@@ -24,16 +23,16 @@ Phạm vi: Website quản lý nội bộ cho trình dược viên, bỏ n8n kh�
 
 | ID | Nhóm | Kịch bản | Bước test | Kết quả mong đợi |
 | --- | --- | --- | --- | --- |
-| UAT-01 | Truy cập | Mở website production | Vào `https://cpc1hn-tdv-management.netlify.app` | Nếu Netlify Edge Access bật, người dùng phải đăng nhập Netlify trước khi vào app |
-| UAT-02 | Phân quyền | Quản lý xem toàn bộ hệ thống | Chọn tài khoản Quản lý trong selector demo | Thấy menu Quản trị, dashboard tổng hợp toàn hệ thống |
-| UAT-03 | Phân quyền | Nhân viên không thấy màn Quản trị | Chọn tài khoản Nhân viên | Menu Quản trị bị ẩn, không có form thêm/sửa master data |
+| UAT-01 | Truy cập | Mở website production | Vào `https://cpc1hn-tdv-management.netlify.app` | Mở được ở mọi máy và hiện màn đăng nhập của app |
+| UAT-02 | Phân quyền | Quản lý xem toàn bộ hệ thống | Đăng nhập tài khoản Quản lý | Thấy menu Quản trị, dashboard tổng hợp toàn hệ thống |
+| UAT-03 | Phân quyền | Nhân viên không thấy màn Quản trị | Đăng nhập tài khoản Nhân viên | Menu Quản trị bị ẩn, không có form thêm/sửa master data |
 | UAT-04 | Phân quyền | Nhân viên chỉ thấy khách hàng được phân công | Chọn Nhân viên Đà Nẵng, kiểm danh sách khách hàng | Không thấy khách hàng ngoài phạm vi phụ trách |
 | UAT-05 | Kê đơn | Nhân viên nhập kê đơn mới | Chọn khách hàng, sản phẩm, số lượng, ngày, gửi form | Bản ghi xuất hiện trong danh sách và dashboard cập nhật |
 | UAT-06 | Doanh số | Nhân viên nhập doanh số mới | Chọn khách hàng, sản phẩm, số tiền, ngày, gửi form | Doanh số tháng tăng, danh sách doanh số cập nhật |
 | UAT-07 | Thầu | Cập nhật tiến độ gói thầu | Chọn khách hàng bệnh viện/sở, nhập mã gói thầu và trạng thái | Danh sách thầu hiển thị trạng thái mới |
 | UAT-08 | Cảnh báo | Tính phòng mạch mất sale | Gọi nút/lệnh cảnh báo hoặc xem dashboard | Khách hàng không có doanh số 4 tháng liên tục được đưa vào danh sách cảnh báo |
 | UAT-09 | Nhắc báo cáo | Tính nhân viên chưa báo cáo ngày | Gọi nhắc nhở báo cáo | Nhân viên chưa có báo cáo ngày hiện tại xuất hiện trong danh sách |
-| UAT-10 | Quản trị nhân sự | Quản lý thêm tài khoản Nhân viên | Vào Quản trị, nhập ID, tên, email, vai trò, trạng thái | Tài khoản mới xuất hiện trong danh sách nhân sự và selector demo |
+| UAT-10 | Quản trị nhân sự | Quản lý thêm tài khoản Nhân viên | Vào Quản trị, nhập ID, tên, email, tài khoản, mật khẩu, vai trò, trạng thái | Tài khoản mới đăng nhập được bằng thông tin vừa tạo |
 | UAT-11 | Quản trị nhân sự | Quản lý sửa tài khoản Nhân viên | Bấm Sửa, đổi tên/vai trò/trạng thái, lưu | Danh sách nhân sự cập nhật đúng |
 | UAT-12 | Quản trị nhân sự | Quản lý xóa tài khoản | Bấm Xóa với một tài khoản test | Tài khoản chuyển trạng thái inactive và không được xác thực API |
 | UAT-13 | Quản trị địa bàn | Quản lý thêm/sửa địa bàn | Nhập mã, tên địa bàn, vùng | Địa bàn mới xuất hiện để phân công |
@@ -81,6 +80,6 @@ MVP được xem là đạt UAT khi:
 
 ## 6. Rủi ro còn lại cần xác nhận trước production thật
 
-- Selector tài khoản hiện là cơ chế demo để test nhanh; bản production thật cần nối với đăng nhập thật và lấy email từ identity provider.
-- Production đang bật Netlify Edge Access/SSO, nên test UI tự động từ terminal không vào được nếu không có phiên đăng nhập.
+- Production dùng đăng nhập tài khoản/mật khẩu trong app.
+- Netlify Edge Access/SSO đã tắt để link mở được ở mọi máy.
 - Local database của Netlify có khác biệt extension so với production database, nên migration local có thể cần chỉnh riêng nếu muốn dev offline hoàn toàn.

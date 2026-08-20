@@ -14,8 +14,8 @@ Production URL: `https://cpc1hn-tdv-management.netlify.app`
 | GitHub push | PASS | Commit UAT đã được đẩy lên `main` |
 | Netlify CI/CD deploy | PASS | Deploy production mới nhất trạng thái `ready` |
 | Function health local | PASS | Handler trả `200 {"ok":true,...}` |
-| Production HTTP | BLOCKED EXPECTED | Production trả `401` do Netlify Edge Access/SSO đang bật |
-| UI UAT production bằng terminal | NOT RUN | Không mở trình duyệt theo yêu cầu tiết kiệm token; cần phiên đăng nhập Netlify để test UI |
+| Production HTTP | UPDATED | Netlify Edge Access/SSO đã được tắt sau biên bản này |
+| UI UAT production bằng terminal | PARTIAL | Có thể kiểm tra HTTP/API; thao tác UI đầy đủ vẫn cần test bằng trình duyệt người dùng |
 
 ## 2. Kết quả kiểm tra tự động
 
@@ -71,9 +71,9 @@ Kiểm tra:
 
 Kết quả:
 
-- Cả hai trả `401`.
-- Đây là trạng thái phù hợp khi Netlify Edge Access/SSO đang bật.
-- Chưa thể xác nhận UI production bằng terminal nếu không có phiên đăng nhập.
+- Kết quả cũ: từng trả `401` khi Netlify Edge Access/SSO bật.
+- Trạng thái mới: đã tắt SSO cấp site để website mở được ở mọi máy.
+- App hiện dùng đăng nhập tài khoản/mật khẩu riêng.
 
 ## 5. UAT nghiệp vụ cần test tay sau khi đăng nhập Netlify
 
@@ -105,8 +105,8 @@ Kết quả:
 
 | Mức độ | Nội dung | Ảnh hưởng | Đề xuất |
 | --- | --- | --- | --- |
-| High | Production bật Netlify Edge Access/SSO nên terminal không thể UAT UI/API trực tiếp | Không thể tự động xác nhận màn hình sau deploy nếu không có phiên đăng nhập | Test tay sau đăng nhập hoặc tạo deploy preview tạm thời không SSO |
-| Medium | Selector tài khoản trong app hiện là cơ chế demo | Chưa phải xác thực production thật theo email đăng nhập | Giai đoạn sau nối Netlify Identity/OAuth và bỏ selector demo |
+| Fixed | Production từng bật Netlify Edge Access/SSO | Link không mở được ở mọi máy | Đã tắt SSO cấp site |
+| Fixed | App từng dùng selector tài khoản demo | Không đủ điều kiện bàn giao public | Đã chuyển sang đăng nhập tài khoản/mật khẩu trong app |
 | Fixed | Dashboard từng dùng tháng demo `2026-08` | Có thể sai khi qua tháng khác | Đã chuyển sang tháng hiện tại theo giờ Việt Nam |
 | Fixed | Nhắc báo cáo từng cố định ngày `2026-08-20` | Có thể sai khi qua ngày khác | Đã chuyển sang ngày hiện tại theo giờ Việt Nam |
 | Low | UAT local DB chưa chạy end-to-end vì local Netlify DB khác production ở extension migration | Không ảnh hưởng build production đã pass, nhưng hạn chế dev offline | Tạo migration local-compatible hoặc seed test DB riêng |
@@ -115,5 +115,5 @@ Kết quả:
 
 MVP đạt các kiểm tra kỹ thuật nền tảng: build, routing, functions, dữ liệu mẫu, form quản trị, và loại bỏ n8n khỏi app path.
 
-UAT nghiệp vụ đầy đủ trên production cần bước đăng nhập Netlify để xác nhận thao tác UI thật. Trạng thái `401` hiện tại là hợp lệ với cấu hình SSO đang bật, không phải lỗi build.
+UAT nghiệp vụ đầy đủ trên production cần đăng nhập bằng tài khoản trong app để xác nhận thao tác UI thật.
 

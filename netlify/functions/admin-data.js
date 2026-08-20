@@ -1,6 +1,7 @@
 const { one, query } = require("./shared/db");
 const { isAdmin, requireUser } = require("./shared/auth");
 const { handleError, json, methodNotAllowed, parseBody } = require("./shared/http");
+const crypto = require("node:crypto");
 
 function requireAdmin(user) {
   if (!isAdmin(user)) {
@@ -25,7 +26,7 @@ async function upsertTerritory(data) {
 
 async function upsertEmployee(data) {
   const role = ["QuanLy", "Admin", "Manager"].includes(data.role) ? "QuanLy" : "NhanVien";
-  return one(
+  const employee = await one(
     `insert into tb_nhan_su (id_nhan_vien, ten_nhan_vien, email, chuc_vu, trang_thai)
      values ($1, $2, lower($3), $4, coalesce($5, 'Active'))
      on conflict (id_nhan_vien)
@@ -36,6 +37,25 @@ async function upsertEmployee(data) {
      returning id_nhan_vien as id`,
     [data.id, data.name, data.email, role, data.status || "Active"]
   );
+
+  if (data.username && data.password) {
+    const salt = crypto.randomBytes(16).toString("hex");
+    const iterations = 210000;
+    const passwordHash = crypto.pbkdf2Sync(String(data.password), salt, iterations, 32, "sha256").toString("hex");
+    await query(
+      `insert into auth_credentials (username, id_nhan_vien, password_salt, password_hash, iterations)
+       values ($1, $2, $3, $4, $5)
+       on conflict (username)
+       do update set id_nhan_vien = excluded.id_nhan_vien,
+                     password_salt = excluded.password_salt,
+                     password_hash = excluded.password_hash,
+                     iterations = excluded.iterations,
+                     updated_at = now()`,
+      [String(data.username).trim(), data.id, salt, passwordHash, iterations]
+    );
+  }
+
+  return employee;
 }
 
 async function upsertProduct(data) {

@@ -28,6 +28,33 @@ body {
   min-height: 100vh;
 }
 
+.login-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.login-panel {
+  width: min(420px, 100%);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 22px;
+  display: grid;
+  gap: 14px;
+}
+
+.login-panel .brand {
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+.login-message {
+  color: var(--danger);
+  min-height: 18px;
+}
+
 .sidebar {
   background: #17202a;
   color: #fff;
@@ -131,10 +158,12 @@ label {
   color: var(--muted);
 }
 
-.user-switcher {
-  display: grid;
-  gap: 6px;
-  min-width: 280px;
+.account-box {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
 }
 
 .section {
@@ -401,7 +430,7 @@ tr:last-child td {
     grid-template-columns: 1fr;
   }
 
-  .user-switcher {
-    min-width: 0;
+  .account-box {
+    justify-content: flex-start;
   }
 }

@@ -25,6 +25,16 @@
   status = 200
 
 [[redirects]]
+  from = "/api/v1/login"
+  to = "/.netlify/functions/login"
+  status = 200
+
+[[redirects]]
+  from = "/api/v1/logout"
+  to = "/.netlify/functions/logout"
+  status = 200
+
+[[redirects]]
   from = "/api/v1/prescriptions"
   to = "/.netlify/functions/prescriptions"
   status = 200

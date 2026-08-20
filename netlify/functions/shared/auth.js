@@ -1,33 +1,25 @@
 const { one, query } = require("./db");
+const crypto = require("node:crypto");
 
-function getEmail(event) {
-  const headerEmail = event.headers["x-user-email"] || event.headers["X-User-Email"];
-  const queryEmail = event.queryStringParameters && event.queryStringParameters.email;
-  return String(headerEmail || queryEmail || "").trim().toLowerCase();
+function hashToken(token) {
+  return crypto.createHash("sha256").update(token).digest("hex");
 }
 
-async function requireUser(event) {
-  const email = getEmail(event);
-  if (!email) {
-    const error = new Error("Missing user email");
-    error.statusCode = 401;
-    error.publicMessage = "Thiếu email đăng nhập.";
-    throw error;
-  }
+function getBearerToken(event) {
+  const header = event.headers.authorization || event.headers.Authorization || "";
+  const match = String(header).match(/^Bearer\s+(.+)$/i);
+  return match ? match[1].trim() : "";
+}
 
+async function loadUserById(employeeId) {
   const user = await one(
     `select id_nhan_vien, ten_nhan_vien, email, chuc_vu
      from tb_nhan_su
-     where lower(email) = $1 and trang_thai = 'Active'`,
-    [email]
+     where id_nhan_vien = $1 and trang_thai = 'Active'`,
+    [employeeId]
   );
 
-  if (!user) {
-    const error = new Error(`Unknown user: ${email}`);
-    error.statusCode = 403;
-    error.publicMessage = "Tài khoản chưa được phân quyền trong hệ thống.";
-    throw error;
-  }
+  if (!user) return null;
 
   user.territoryIds = (
     await query(
@@ -37,6 +29,40 @@ async function requireUser(event) {
       [user.id_nhan_vien]
     )
   ).map((row) => row.id_dia_ban);
+
+  return user;
+}
+
+async function requireUser(event) {
+  const token = getBearerToken(event);
+  if (!token) {
+    const error = new Error("Missing user email");
+    error.statusCode = 401;
+    error.publicMessage = "Vui lòng đăng nhập.";
+    throw error;
+  }
+
+  const session = await one(
+    `select id_nhan_vien
+     from auth_sessions
+     where token_hash = $1 and expires_at > now()`,
+    [hashToken(token)]
+  );
+
+  if (!session) {
+    const error = new Error("Invalid session");
+    error.statusCode = 401;
+    error.publicMessage = "Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.";
+    throw error;
+  }
+
+  const user = await loadUserById(session.id_nhan_vien);
+  if (!user) {
+    const error = new Error(`Unknown user id: ${session.id_nhan_vien}`);
+    error.statusCode = 403;
+    error.publicMessage = "Tài khoản chưa được phân quyền trong hệ thống.";
+    throw error;
+  }
 
   return user;
 }
@@ -85,5 +111,7 @@ module.exports = {
   requireUser,
   isAdmin,
   customerScopeSql,
-  assertCustomerAccess
+  assertCustomerAccess,
+  hashToken,
+  loadUserById
 };

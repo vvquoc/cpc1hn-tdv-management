@@ -39,6 +39,8 @@ check("UAT-AUTO-02", "Public API routes are mapped to Netlify functions", () => 
   const toml = read("netlify.toml");
   const routes = [
     "bootstrap-data",
+    "login",
+    "logout",
     "prescriptions",
     "sales",
     "tenders",
@@ -105,7 +107,7 @@ check("UAT-AUTO-06", "Website writes operational data through role-scoped APIs",
   for (const endpoint of endpoints) {
     assert(app.includes(endpoint), `Missing frontend call to ${endpoint}`);
   }
-  assert(app.includes("x-user-email"), "Missing user email header");
+  assert(app.includes("authorization"), "Missing bearer token header");
   assert(app.includes("canAdmin"), "Missing admin visibility guard");
 });
 
@@ -141,6 +143,8 @@ check("UAT-AUTO-08", "Data import templates are ready for real data", () => {
 check("UAT-AUTO-09", "Netlify functions can be loaded by Node", () => {
   const functions = [
     "bootstrap-data",
+    "login",
+    "logout",
     "prescriptions",
     "sales",
     "tenders",

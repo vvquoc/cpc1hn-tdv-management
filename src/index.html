@@ -7,7 +7,24 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div class="app-shell">
+    <section id="loginScreen" class="login-screen">
+      <form id="loginForm" class="login-panel">
+        <div class="brand">
+          <span class="brand-mark">C1</span>
+          <div>
+            <strong>CPC1 Hà Nội</strong>
+            <span>Quản lý TDV</span>
+          </div>
+        </div>
+        <h1>Đăng nhập</h1>
+        <label>Tài khoản<input name="username" autocomplete="username" required /></label>
+        <label>Mật khẩu<input name="password" type="password" autocomplete="current-password" required /></label>
+        <button type="submit">Đăng nhập</button>
+        <p id="loginMessage" class="login-message"></p>
+      </form>
+    </section>
+
+    <div id="appShell" class="app-shell" hidden>
       <aside class="sidebar">
         <div class="brand">
           <span class="brand-mark">C1</span>
@@ -32,10 +49,10 @@
             <h1>Core MVP</h1>
             <p>Theo dõi KPI, kê đơn, doanh số và tiến độ thầu theo phân quyền địa bàn.</p>
           </div>
-          <label class="user-switcher">
-            Tài khoản
-            <select id="activeUser"></select>
-          </label>
+          <div class="account-box">
+            <span id="activeAccount"></span>
+            <button id="logoutButton" class="secondary-button" type="button">Đăng xuất</button>
+          </div>
         </header>
 
         <section id="dashboard" class="section">
@@ -201,6 +218,8 @@
               <label>Mã nhân viên<input name="id" placeholder="NV-DN-02" required /></label>
               <label>Họ tên<input name="name" required /></label>
               <label>Email đăng nhập<input name="email" type="email" required /></label>
+              <label>Tài khoản<input name="username" placeholder="VD: 15801" /></label>
+              <label>Mật khẩu<input name="password" type="password" autocomplete="new-password" placeholder="Để trống nếu không đổi" /></label>
               <label>Vai trò
                 <select name="role" required>
                   <option value="NhanVien">Nhân viên</option>

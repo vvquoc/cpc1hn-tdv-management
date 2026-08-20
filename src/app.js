@@ -1,4 +1,5 @@
-const STORAGE_EMAIL_KEY = "cpc1hn-tdv-active-email";
+const STORAGE_TOKEN_KEY = "cpc1hn-tdv-auth-token";
+const STORAGE_USER_KEY = "cpc1hn-tdv-auth-user";
 const currency = new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 });
 
 const statusLabel = {
@@ -11,6 +12,8 @@ const statusLabel = {
 const demoUsers = window.CPC1_SEED.employees;
 let state = structuredClone(window.CPC1_SEED);
 let apiReady = false;
+let authToken = localStorage.getItem(STORAGE_TOKEN_KEY) || "";
+let authUser = JSON.parse(localStorage.getItem(STORAGE_USER_KEY) || "null");
 
 const roleLabel = {
   NhanVien: "Nhân viên",
@@ -50,12 +53,8 @@ function currentPeriod() {
   return currentDate().slice(0, 7);
 }
 
-function activeEmail() {
-  return document.querySelector("#activeUser").value;
-}
-
 function activeEmployee() {
-  return state.employees.find((item) => item.email === activeEmail()) || state.activeUser || state.employees[0];
+  return state.activeUser || authUser || state.employees[0];
 }
 
 function canAdmin() {
@@ -68,7 +67,7 @@ async function api(path, options = {}) {
     ...options,
     headers: {
       "content-type": "application/json",
-      "x-user-email": activeEmail(),
+      ...(authToken ? { authorization: `Bearer ${authToken}` } : {}),
       ...(options.headers || {})
     }
   });
@@ -108,14 +107,6 @@ function setOptions(select, items, labelFor) {
   select.innerHTML = items.map((item) => `<option value="${item.id || item.email}">${labelFor(item)}</option>`).join("");
 }
 
-function setEmailOptions() {
-  const select = document.querySelector("#activeUser");
-  const current = select.value || localStorage.getItem(STORAGE_EMAIL_KEY) || demoUsers[0].email;
-  const users = (state.employees && state.employees.length ? state.employees : demoUsers).filter((employee) => employee.status !== "Inactive");
-  select.innerHTML = users.map((employee) => `<option value="${employee.email}">${employee.name} · ${roleLabel[employee.role] || employee.role}</option>`).join("");
-  select.value = users.some((employee) => employee.email === current) ? current : users[0]?.email || "";
-}
-
 function showNotice(message) {
   let notice = document.querySelector("#notice");
   if (!notice) {
@@ -128,27 +119,45 @@ function showNotice(message) {
   notice.hidden = !message;
 }
 
+function showLogin(message = "") {
+  document.querySelector("#loginScreen").hidden = false;
+  document.querySelector("#appShell").hidden = true;
+  document.querySelector("#loginMessage").textContent = message;
+}
+
+function showApp() {
+  document.querySelector("#loginScreen").hidden = true;
+  document.querySelector("#appShell").hidden = false;
+}
+
 async function loadData() {
-  localStorage.setItem(STORAGE_EMAIL_KEY, activeEmail());
+  if (!authToken) return showLogin();
   try {
     const data = await api("/api/v1/bootstrap-data");
     state = data;
+    authUser = data.activeUser;
+    localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(authUser));
     apiReady = true;
     if (["QuanLy", "Admin", "Manager"].includes(state.activeUser?.role)) {
       const assignments = await api("/api/v1/admin-data");
       state.employeeTerritories = assignments.employeeTerritories || [];
       state.employeeCustomers = assignments.employeeCustomers || [];
     }
+    showApp();
     showNotice("");
   } catch (error) {
     apiReady = false;
-    showNotice(`Chưa kết nối được database production: ${error.message}`);
+    authToken = "";
+    authUser = null;
+    localStorage.removeItem(STORAGE_TOKEN_KEY);
+    localStorage.removeItem(STORAGE_USER_KEY);
+    showLogin(error.message);
+    return;
   }
   render();
 }
 
 function render() {
-  setEmailOptions();
   const employee = activeEmployee();
   const customers = state.customers || [];
   const activeCustomers = customers.filter((customer) => customer.status !== "Inactive");
@@ -159,6 +168,7 @@ function render() {
   const tenders = (state.tenders || []).filter((item) => customerIds.includes(item.customerId));
   const lostSales = computeLostSales(customers);
 
+  document.querySelector("#activeAccount").textContent = `${employee.name} · ${roleLabel[employee.role] || employee.role}`;
   document.querySelector("#scopeLabel").textContent = `${employee.name} · ${roleLabel[employee.role] || employee.role} · ${(employee.territoryIds || []).join(", ")}`;
   document.querySelector("#metricSales").textContent = currency.format(
     sales.filter((sale) => sale.period === currentPeriod()).reduce((sum, sale) => sum + Number(sale.amount), 0)
@@ -386,6 +396,48 @@ function renderAdmin() {
 }
 
 function bindForms() {
+  document.querySelector("#loginForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    document.querySelector("#loginMessage").textContent = "";
+
+    try {
+      const response = await fetch("/api/v1/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          username: form.get("username"),
+          password: form.get("password")
+        })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Không đăng nhập được.");
+
+      authToken = payload.token;
+      authUser = payload.user;
+      localStorage.setItem(STORAGE_TOKEN_KEY, authToken);
+      localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(authUser));
+      event.currentTarget.reset();
+      await loadData();
+    } catch (error) {
+      showLogin(error.message);
+    }
+  });
+
+  document.querySelector("#logoutButton").addEventListener("click", async () => {
+    try {
+      await api("/api/v1/logout", { method: "POST" });
+    } catch {
+      // Local logout should still proceed if the remote session is already gone.
+    }
+    authToken = "";
+    authUser = null;
+    apiReady = false;
+    localStorage.removeItem(STORAGE_TOKEN_KEY);
+    localStorage.removeItem(STORAGE_USER_KEY);
+    showLogin();
+  });
+
   document.querySelector("#prescriptionForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!apiReady) return showNotice("Database chưa sẵn sàng, chưa thể ghi kê đơn.");
@@ -587,7 +639,6 @@ function bindForms() {
     }
   });
 
-  document.querySelector("#activeUser").addEventListener("change", loadData);
   document.querySelector("#runLostSale").addEventListener("click", async () => {
     if (!apiReady) return renderAlerts(computeLostSales(state.customers || []), []);
 
@@ -608,13 +659,10 @@ function setDefaultDates() {
   document.querySelector("input[name='period']").value = currentPeriod();
 }
 
-function initUsers() {
-  const savedEmail = localStorage.getItem(STORAGE_EMAIL_KEY) || demoUsers[0].email;
-  setOptions(document.querySelector("#activeUser"), demoUsers, (employee) => `${employee.name} · ${roleLabel[employee.role] || employee.role}`);
-  document.querySelector("#activeUser").value = savedEmail;
-}
-
-initUsers();
 setDefaultDates();
 bindForms();
-loadData();
+if (authToken) {
+  loadData();
+} else {
+  showLogin();
+}
