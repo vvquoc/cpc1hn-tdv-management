@@ -7,6 +7,7 @@ process.env.AUTH_TOKEN_SECRET = "backend-uat-only-secret-with-enough-entropy";
 const { hashPassword, verifyPassword } = require("../netlify/functions/shared/credentials.js");
 const { createToken, verifyToken } = require("../netlify/functions/shared/auth.js");
 const { parseBody } = require("../netlify/functions/shared/http.js");
+const dataSale = require("../netlify/functions/data-sale-import.js")._test;
 
 const checks = [];
 function check(name, run) {
@@ -56,6 +57,14 @@ check("BACKEND-06 rejects malformed JSON", () => {
   let rejected = false;
   try { parseBody({ body: "{" }); } catch (error) { rejected = error.statusCode === 400; }
   assert(rejected, "malformed JSON accepted");
+});
+
+check("BACKEND parses Vietnamese DATA SALE numbers exactly", () => {
+  assert(dataSale.numeric("1.111.111", "DOANH SỐ") === 1111111, "thousand separators failed");
+  assert(dataSale.numeric("30.714,286", "Đơn giá") === 30714.286, "decimal separators failed");
+  assert(dataSale.numeric("1,5", "Hệ số") === 1.5, "coefficient failed");
+  assert(dataSale.numeric("-", "DOANH SỐ") === 0, "accounting zero failed");
+  assert(dataSale.numeric("(895.238)", "DOANH SỐ") === -895238, "accounting negative failed");
 });
 
 const migration = source("netlify/database/migrations/009_lightweight_crud_auth.sql");

@@ -20,8 +20,21 @@ function text(row, key) {
 }
 
 function numeric(value, label) {
-  const normalized = String(value ?? "").trim().replace(/\s/g, "").replace(/,/g, "");
-  const result = Number(normalized);
+  let raw = String(value ?? "").trim().replace(/\s/g, "");
+  if (!raw || raw === "-") return 0;
+  const negative = /^\(.+\)$/.test(raw);
+  if (negative) raw = raw.slice(1, -1);
+  let normalized = raw;
+  if (label === "Hệ số") {
+    normalized = raw.replace(",", ".");
+  } else if (/^-?\d{1,3}(?:\.\d{3})+(?:,\d+)?$/.test(raw)) {
+    normalized = raw.replace(/\./g, "").replace(",", ".");
+  } else if (/^-?\d+,\d+$/.test(raw)) {
+    normalized = raw.replace(",", ".");
+  } else if (raw.includes(".") && raw.includes(",")) {
+    normalized = raw.replace(/\./g, "").replace(",", ".");
+  }
+  const result = Number(normalized) * (negative ? -1 : 1);
   if (!Number.isFinite(result)) fail(`${label} không phải là số hợp lệ.`);
   return result;
 }
@@ -83,6 +96,7 @@ function normalizeRow(row, rowNumber) {
     unit: text(row, "DVT"), quantity: numeric(row["Số Lượng"], "Số Lượng"), unitPrice: numeric(row["Đơn giá"], "Đơn giá"),
     revenue: numeric(row["Doanh thu"], "Doanh thu"), coefficient: numeric(row["Hệ số"], "Hệ số"), sales: numeric(row["DOANH SỐ"], "DOANH SỐ")
   };
+  if (!normalized.customerName) normalized.customerName = normalized.customerCode;
   for (const [key, value] of Object.entries(normalized)) if (typeof value === "string" && !value) fail(`Dòng ${rowNumber}: ${key} không được để trống.`);
   normalized.rowHash = crypto.createHash("sha256").update(JSON.stringify(normalized)).digest("hex");
   return normalized;
@@ -132,10 +146,34 @@ async function upsertMasters(client, row, cache) {
 }
 
 exports.handler = async (event) => {
-  if (event.httpMethod !== "POST") return methodNotAllowed();
+  if (event.httpMethod !== "GET" && event.httpMethod !== "POST") return methodNotAllowed();
   try {
     const user = await requireDatabaseUser(event);
     if (!isAdmin(user)) fail("Chỉ Quản lý được nhập DATA SALE.", 403);
+    if (event.httpMethod === "GET") {
+      const result = await getPool().query(`select count(*)::int as row_count,
+        count(distinct source_row_number)::int as source_row_count,
+        min(source_row_number)::int as min_source_row,max(source_row_number)::int as max_source_row,
+        count(distinct id_nhan_vien)::int as employee_count,count(distinct id_khach_hang)::int as customer_count,
+        count(distinct id_san_pham)::int as product_count,coalesce(sum(doanh_so),0)::numeric as total_sales,
+        min(ngay_chung_tu) as first_document_date,max(ngay_chung_tu) as last_document_date
+        from data_sale_transactions where source_spreadsheet_id=$1 and source_sheet_id=$2`, [SOURCE_SPREADSHEET_ID, SOURCE_SHEET_ID]);
+      const row = result.rows[0];
+      return json(200, {
+        sourceSpreadsheetId: SOURCE_SPREADSHEET_ID,
+        sourceSheetId: SOURCE_SHEET_ID,
+        rowCount: row.row_count,
+        sourceRowCount: row.source_row_count,
+        minSourceRow: row.min_source_row,
+        maxSourceRow: row.max_source_row,
+        employeeCount: row.employee_count,
+        customerCount: row.customer_count,
+        productCount: row.product_count,
+        totalSales: Number(row.total_sales),
+        firstDocumentDate: row.first_document_date,
+        lastDocumentDate: row.last_document_date
+      });
+    }
     const body = parseBody(event);
     const rows = Array.isArray(body.rows) ? body.rows : [];
     if (!rows.length || rows.length > 1000) fail("Mỗi lượt nhập DATA SALE cần từ 1 đến 1.000 dòng.");
@@ -175,3 +213,5 @@ exports.handler = async (event) => {
     return handleError(error);
   }
 };
+
+exports._test = { numeric, isoDate };

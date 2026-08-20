@@ -11,3 +11,4 @@ dist/
 outputs/
 dbml-error.log
 *.inspect.ndjson
+data-sale-production.csv
