@@ -11,6 +11,8 @@ Production URL: `https://cpc1hn-tdv-management.netlify.app`
 | Build local | PASS | `npm run build` hoàn tất, sinh `dist/` |
 | UAT tự động | PASS | 9/9 kiểm tra pass |
 | Netlify build | PASS | Netlify CLI build production pass, đóng gói đủ 8 functions |
+| GitHub push | PASS | Commit `fb044c0` đã được đẩy lên `main` |
+| Netlify CI/CD deploy | PASS | Deploy production commit `fb044c0` trạng thái `ready` |
 | Function health local | PASS | Handler trả `200 {"ok":true,...}` |
 | Production HTTP | BLOCKED EXPECTED | Production trả `401` do Netlify Edge Access/SSO đang bật |
 | UI UAT production bằng terminal | NOT RUN | Không mở trình duyệt theo yêu cầu tiết kiệm token; cần phiên đăng nhập Netlify để test UI |
@@ -97,7 +99,7 @@ Kết quả:
 | UAT-18 | MR gọi API quản trị bị chặn | PENDING API WITH DB |
 | UAT-19 | MR nhập khách hàng ngoài quyền bị chặn | PENDING API WITH DB |
 | UAT-20 | Mở workbook/CSV mẫu data thật | PASS FILE EXISTS |
-| UAT-21 | Push GitHub để Netlify CI/CD deploy | PENDING AFTER COMMIT/PUSH |
+| UAT-21 | Push GitHub để Netlify CI/CD deploy | PASS |
 
 ## 6. Phát hiện và rủi ro
 
