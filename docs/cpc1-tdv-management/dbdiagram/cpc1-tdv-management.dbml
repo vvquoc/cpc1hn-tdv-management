@@ -1,0 +1,129 @@
+Enum employee_role {
+  MR
+  Supervisor
+  Manager
+  Admin
+}
+
+Enum customer_type {
+  BenhVien
+  SoYTe
+  PhongMachTu
+}
+
+Enum tender_status {
+  DangLamHoSo
+  ChoKetQua
+  TrungThau
+  TruotThau
+}
+
+Table tb_dia_ban {
+  id_dia_ban varchar [pk, note: 'mã địa bàn']
+  ten_dia_ban varchar [not null]
+  khu_vuc varchar [not null]
+  created_at timestamp [default: `now()`]
+}
+
+Table tb_nhan_su {
+  id_nhan_vien varchar [pk, note: 'mã nhân sự nội bộ']
+  ten_nhan_vien varchar [not null]
+  email varchar [unique, not null, note: 'email đăng nhập để phân quyền']
+  chuc_vu employee_role [not null]
+  trang_thai varchar [default: 'Active']
+  created_at timestamp [default: `now()`]
+}
+
+Table employee_territories {
+  id_nhan_vien varchar [ref: > tb_nhan_su.id_nhan_vien]
+  id_dia_ban varchar [ref: > tb_dia_ban.id_dia_ban]
+  is_primary boolean [default: false]
+  assigned_at timestamp [default: `now()`]
+
+  Indexes {
+    (id_nhan_vien, id_dia_ban) [pk]
+  }
+}
+
+Table tb_san_pham {
+  id_san_pham varchar [pk]
+  ten_san_pham varchar [not null]
+  hoat_chat varchar
+  dang_bao_che varchar [not null, note: 'BFS, BOV, MDI, viên đặt đổ khuôn hoặc dạng khác']
+  quy_cach varchar
+  gia_ke_don decimal [not null]
+  trang_thai varchar [default: 'Active']
+}
+
+Table tb_khach_hang {
+  id_khach_hang varchar [pk]
+  ten_khach_hang varchar [not null]
+  loai_khach_hang customer_type [not null]
+  dia_chi text
+  dien_thoai varchar
+  id_dia_ban varchar [not null, ref: > tb_dia_ban.id_dia_ban]
+  trang_thai varchar [default: 'Active']
+}
+
+Table employee_customers {
+  id_nhan_vien varchar [ref: > tb_nhan_su.id_nhan_vien]
+  id_khach_hang varchar [ref: > tb_khach_hang.id_khach_hang]
+  assigned_at timestamp [default: `now()`]
+
+  Indexes {
+    (id_nhan_vien, id_khach_hang) [pk]
+  }
+}
+
+Table tb_ke_don {
+  id_giao_dich uuid [pk, default: `gen_random_uuid()`]
+  ngay_bao_cao date [not null]
+  id_nhan_vien varchar [not null, ref: > tb_nhan_su.id_nhan_vien]
+  id_khach_hang varchar [not null, ref: > tb_khach_hang.id_khach_hang]
+  id_san_pham varchar [not null, ref: > tb_san_pham.id_san_pham]
+  so_luong_ke_don int [not null]
+  doanh_so_phat_sinh decimal [not null]
+  created_at timestamp [default: `now()`]
+}
+
+Table tb_doanh_thu {
+  id_doanh_thu uuid [pk, default: `gen_random_uuid()`]
+  thang_nam varchar [not null, note: 'YYYY-MM']
+  id_khach_hang varchar [not null, ref: > tb_khach_hang.id_khach_hang]
+  id_san_pham varchar [not null, ref: > tb_san_pham.id_san_pham]
+  id_nhan_vien varchar [not null, ref: > tb_nhan_su.id_nhan_vien]
+  doanh_so_thuc decimal [not null]
+  source_note varchar
+  created_at timestamp [default: `now()`]
+}
+
+Table tb_thau {
+  id_goi_thau varchar [pk]
+  id_khach_hang varchar [not null, ref: > tb_khach_hang.id_khach_hang]
+  id_san_pham varchar [not null, ref: > tb_san_pham.id_san_pham]
+  so_luong_thau int
+  gia_du_thau decimal
+  trang_thai tender_status [not null]
+  id_nhan_vien varchar [not null, ref: > tb_nhan_su.id_nhan_vien]
+  han_nop date
+  ngay_cap_nhat date
+}
+
+Table daily_reports {
+  id uuid [pk, default: `gen_random_uuid()`]
+  report_date date [not null]
+  id_nhan_vien varchar [not null, ref: > tb_nhan_su.id_nhan_vien]
+  summary text [not null]
+  kpi_note text
+  created_at timestamp [default: `now()`]
+}
+
+Table lost_sale_alerts {
+  id uuid [pk, default: `gen_random_uuid()`]
+  alert_period varchar [not null]
+  id_khach_hang varchar [not null, ref: > tb_khach_hang.id_khach_hang]
+  id_nhan_vien varchar [not null, ref: > tb_nhan_su.id_nhan_vien]
+  reason text [not null]
+  resolved_at timestamp
+  created_at timestamp [default: `now()`]
+}

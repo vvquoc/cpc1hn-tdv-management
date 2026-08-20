@@ -1,0 +1,48 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+[dev]
+  command = "npm run build -- --watch"
+  port = 3000
+  publish = "dist"
+  functionsPort = 9999
+  autoLaunch = false
+
+[context.production.environment]
+  NODE_VERSION = "20"
+
+[context.deploy-preview.environment]
+  NODE_VERSION = "20"
+
+[[redirects]]
+  from = "/api/v1/lost-sales-trigger"
+  to = "/.netlify/functions/lost-sales-trigger"
+  status = 200
+
+[[redirects]]
+  from = "/api/v1/daily-reminders"
+  to = "/.netlify/functions/daily-reminders"
+  status = 200
+
+[[redirects]]
+  from = "/api/v1/health"
+  to = "/.netlify/functions/health"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), camera=(), microphone=()"

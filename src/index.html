@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CPC1HN TDV Management</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark">C1</span>
+          <div>
+            <strong>CPC1 Hà Nội</strong>
+            <span>Quản lý TDV</span>
+          </div>
+        </div>
+        <nav aria-label="Điều hướng chính">
+          <a href="#dashboard">Dashboard</a>
+          <a href="#prescription">Kê đơn</a>
+          <a href="#sales">Doanh số</a>
+          <a href="#tender">Thầu</a>
+          <a href="#alerts">Cảnh báo</a>
+        </nav>
+      </aside>
+
+      <main>
+        <header class="topbar">
+          <div>
+            <h1>Core MVP</h1>
+            <p>Theo dõi KPI, kê đơn, doanh số và tiến độ thầu theo phân quyền địa bàn.</p>
+          </div>
+          <label class="user-switcher">
+            Tài khoản
+            <select id="activeUser"></select>
+          </label>
+        </header>
+
+        <section id="dashboard" class="section">
+          <div class="section-heading">
+            <h2>Tổng quan</h2>
+            <span id="scopeLabel"></span>
+          </div>
+          <div class="metrics">
+            <article>
+              <span>Doanh số tháng</span>
+              <strong id="metricSales">0</strong>
+            </article>
+            <article>
+              <span>Số lượng kê đơn</span>
+              <strong id="metricRx">0</strong>
+            </article>
+            <article>
+              <span>Gói thầu đang mở</span>
+              <strong id="metricTenders">0</strong>
+            </article>
+            <article>
+              <span>Phòng mạch mất sale</span>
+              <strong id="metricLostSales">0</strong>
+            </article>
+          </div>
+        </section>
+
+        <section id="prescription" class="section">
+          <div class="section-heading">
+            <h2>Nhập kê đơn</h2>
+          </div>
+          <form id="prescriptionForm" class="form-grid">
+            <label>Ngày báo cáo<input name="date" type="date" required /></label>
+            <label>Khách hàng<select name="customerId" required></select></label>
+            <label>Sản phẩm<select name="productId" required></select></label>
+            <label>Số lượng<input name="quantity" type="number" min="1" value="1" required /></label>
+            <button type="submit">Ghi nhận kê đơn</button>
+          </form>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Ngày</th>
+                  <th>TDV</th>
+                  <th>Khách hàng</th>
+                  <th>Sản phẩm</th>
+                  <th>SL</th>
+                  <th>Doanh số ước tính</th>
+                </tr>
+              </thead>
+              <tbody id="prescriptionRows"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="sales" class="section">
+          <div class="section-heading">
+            <h2>Doanh số thực tế</h2>
+          </div>
+          <form id="salesForm" class="form-grid">
+            <label>Tháng<input name="period" type="month" required /></label>
+            <label>Khách hàng<select name="customerId" required></select></label>
+            <label>Sản phẩm<select name="productId" required></select></label>
+            <label>Doanh số<input name="amount" type="number" min="0" step="1000" required /></label>
+            <button type="submit">Ghi nhận doanh số</button>
+          </form>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tháng</th>
+                  <th>Khách hàng</th>
+                  <th>Sản phẩm</th>
+                  <th>Doanh số</th>
+                </tr>
+              </thead>
+              <tbody id="salesRows"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="tender" class="section">
+          <div class="section-heading">
+            <h2>Tiến độ thầu</h2>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Gói thầu</th>
+                  <th>Khách hàng</th>
+                  <th>Sản phẩm</th>
+                  <th>Trạng thái</th>
+                  <th>Hạn nộp</th>
+                  <th>Phụ trách</th>
+                </tr>
+              </thead>
+              <tbody id="tenderRows"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="alerts" class="section">
+          <div class="section-heading">
+            <h2>Cảnh báo & nhắc nhở</h2>
+            <button id="runLostSale">Quét mất sale</button>
+          </div>
+          <div class="split">
+            <div>
+              <h3>Phòng mạch mất sale</h3>
+              <ul id="lostSaleList" class="list"></ul>
+            </div>
+            <div>
+              <h3>Chưa báo cáo hôm nay</h3>
+              <ul id="reminderList" class="list"></ul>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="./seed-data.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "cpc1hn-tdv-management",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Core MVP for CPC1 Ha Noi medical representative management.",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "npx netlify dev",
+    "check": "node scripts/build.mjs --check"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
