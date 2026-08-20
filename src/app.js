@@ -13,19 +13,31 @@ let state = structuredClone(window.CPC1_SEED);
 let apiReady = false;
 let authToken = localStorage.getItem(STORAGE_TOKEN_KEY) || "";
 let authUser;
-const pageSize = 20;
+const pageSize = 15;
 const operationState = {
-  prescriptions: { page: 1, total: 0, items: [] },
-  sales: { page: 1, total: 0, items: [] },
-  tenders: { page: 1, total: 0, items: [] }
+  prescriptions: { page: 1, total: 0, items: [], filters: { period: "", search: "" } },
+  sales: { page: 1, total: 0, items: [], filters: { period: "", search: "" } },
+  tenders: { page: 1, total: 0, items: [], filters: { status: "", search: "" } }
 };
 const adminState = {
   activeTab: "employee",
-  pageSize: 15,
-  pages: { employee: 1, product: 1, customer: 1, territory: 1 },
-  searches: { employee: "", product: "", customer: "", territory: "" }
+  pageSize: 6,
+  pages: { employee: 1, product: 1, customer: 1, territory: 1, employeeTerritory: 1, employeeCustomer: 1 },
+  searches: { employee: "", product: "", customer: "", territory: "", employeeTerritory: "", employeeCustomer: "" }
+};
+const alertState = {
+  activeTab: "lostSales",
+  pageSize: 6,
+  pages: { lostSales: 1, reminders: 1 },
+  searches: { lostSales: "", reminders: "" },
+  lostSales: [],
+  reminders: []
 };
 let dashboardState = { period: "", availablePeriods: [], metrics: {} };
+let activeView = ["dashboard", "prescription", "sales", "tender", "alerts", "admin"].includes(location.hash.slice(1))
+  ? location.hash.slice(1)
+  : "dashboard";
+let noticeTimer;
 try {
   authUser = JSON.parse(localStorage.getItem(STORAGE_USER_KEY) || "null");
 } catch {
@@ -159,6 +171,12 @@ function showNotice(message) {
   }
   notice.textContent = message;
   notice.hidden = !message;
+  clearTimeout(noticeTimer);
+  if (message) {
+    noticeTimer = setTimeout(() => {
+      notice.hidden = true;
+    }, 4000);
+  }
 }
 
 function showLogin(message = "") {
@@ -215,12 +233,18 @@ async function loadDashboard(period = "") {
 
 async function loadOperationPage(resource, page = 1) {
   const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
-  if (dashboardState.period && resource !== "tenders") params.set("period", dashboardState.period);
+  const filters = operationState[resource].filters;
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value) params.set(key, value);
+  });
+  if (!filters.period && dashboardState.period && resource !== "tenders") params.set("period", dashboardState.period);
   const payload = await api(`/api/v1/${resource}?${params}`);
-  operationState[resource] = { page: payload.page, total: payload.total, items: payload.items || [] };
+  operationState[resource] = { page: payload.page, total: payload.total, items: payload.items || [], filters };
 }
 
 async function refreshReporting(period = dashboardState.period) {
+  operationState.prescriptions.filters.period = period;
+  operationState.sales.filters.period = period;
   await loadDashboard(period);
   await Promise.all([
     loadOperationPage("prescriptions", 1),
@@ -230,13 +254,25 @@ async function refreshReporting(period = dashboardState.period) {
   render();
 }
 
-function paginationMarkup(resource, data, admin = false) {
-  const size = admin ? adminState.pageSize : pageSize;
+function paginationMarkup(resource, data, size = pageSize) {
   const pages = Math.max(1, Math.ceil(data.total / size));
   const page = Math.min(data.page, pages);
   return `<span>${html(data.total)} bản ghi · Trang ${page}/${pages}</span>
     <button type="button" class="secondary-button" data-page-resource="${resource}" data-page="${page - 1}" ${page <= 1 ? "disabled" : ""} aria-label="Trang trước">‹</button>
     <button type="button" class="secondary-button" data-page-resource="${resource}" data-page="${page + 1}" ${page >= pages ? "disabled" : ""} aria-label="Trang sau">›</button>`;
+}
+
+function showView(view) {
+  if (view === "admin" && !canAdmin()) view = "dashboard";
+  activeView = view;
+  document.querySelectorAll("[data-view-panel]").forEach((panel) => {
+    panel.hidden = panel.dataset.viewPanel !== activeView;
+  });
+  document.querySelectorAll("nav [data-view]").forEach((link) => {
+    link.classList.toggle("active", link.dataset.view === activeView);
+  });
+  history.replaceState(null, "", `#${activeView}`);
+  window.scrollTo({ top: 0, behavior: "auto" });
 }
 
 function render() {
@@ -258,6 +294,12 @@ function render() {
   const reportingPeriod = document.querySelector("#reportingPeriod");
   reportingPeriod.innerHTML = (dashboardState.availablePeriods || []).map((period) => `<option value="${html(period)}">${html(period)}</option>`).join("") || `<option value="${html(dashboardState.period)}">${html(dashboardState.period)}</option>`;
   reportingPeriod.value = dashboardState.period;
+  document.querySelector("#prescriptionFilter [name='period']").value = operationState.prescriptions.filters.period || dashboardState.period;
+  document.querySelector("#prescriptionFilter [name='search']").value = operationState.prescriptions.filters.search;
+  document.querySelector("#salesFilter [name='period']").value = operationState.sales.filters.period || dashboardState.period;
+  document.querySelector("#salesFilter [name='search']").value = operationState.sales.filters.search;
+  document.querySelector("#tenderFilter [name='status']").value = operationState.tenders.filters.status;
+  document.querySelector("#tenderFilter [name='search']").value = operationState.tenders.filters.search;
 
   document.querySelectorAll("form:not(#customerAssignForm) select[name='customerId']").forEach((select) => {
     setOptions(select, activeCustomers, (customer) => customer.name);
@@ -288,23 +330,45 @@ function render() {
     .join("") || '<tr><td colspan="6">Chưa có dữ liệu thầu.</td></tr>';
   document.querySelector("#tenderPagination").innerHTML = paginationMarkup("tenders", operationState.tenders);
 
-  renderAlerts([], []);
+  renderAlerts();
   renderAdmin();
+  showView(activeView);
 }
 
 function renderAlerts(lostSales, reminders) {
-  document.querySelector("#lostSaleList").innerHTML = lostSales.length
-    ? lostSales.map((customer) => `<li><strong>${html(customer.name || customer.customerName)}</strong><br />Không phát sinh doanh số trong 4 tháng gần nhất.</li>`).join("")
-    : "<li>Không có cảnh báo trong phạm vi hiện tại.</li>";
-
+  if (Array.isArray(lostSales)) alertState.lostSales = lostSales;
+  if (Array.isArray(reminders)) alertState.reminders = reminders;
   const today = currentDate();
-  const fallbackReminders = reminders.length
-    ? reminders
+  const reminderSource = alertState.reminders.length
+    ? alertState.reminders
     : (state.employees || []).filter((item) => ["NhanVien", "MR", "Supervisor"].includes(item.role) && !(state.dailyReports || []).some((report) => report.employeeId === item.id && report.date === today));
+  const pageFor = (resource, items, labelFor) => {
+    const search = alertState.searches[resource].toLocaleLowerCase("vi");
+    const filtered = search ? items.filter((item) => labelFor(item).toLocaleLowerCase("vi").includes(search)) : items;
+    const pages = Math.max(1, Math.ceil(filtered.length / alertState.pageSize));
+    const page = Math.min(alertState.pages[resource], pages);
+    alertState.pages[resource] = page;
+    return { items: filtered.slice((page - 1) * alertState.pageSize, page * alertState.pageSize), page, total: filtered.length };
+  };
+  const lostPage = pageFor("lostSales", alertState.lostSales, (item) => item.name || item.customerName || "");
+  const reminderPage = pageFor("reminders", reminderSource, (item) => item.employeeName || item.name || "");
+  document.querySelectorAll("[data-alert-panel]").forEach((panel) => {
+    panel.hidden = panel.dataset.alertPanel !== alertState.activeTab;
+  });
+  document.querySelectorAll("[data-alert-tab]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.alertTab === alertState.activeTab);
+  });
 
-  document.querySelector("#reminderList").innerHTML = fallbackReminders.length
-    ? fallbackReminders.map((item) => `<li><strong>${html(item.employeeName || item.name)}</strong><br />${html(item.message || `Chưa có báo cáo ngày ${today}.`)}</li>`).join("")
+  document.querySelector("#lostSaleList").innerHTML = lostPage.items.length
+    ? lostPage.items.map((customer) => `<li><strong>${html(customer.name || customer.customerName)}</strong><br />Không phát sinh doanh số trong 4 tháng gần nhất.</li>`).join("")
+    : "<li>Không có cảnh báo trong phạm vi hiện tại.</li>";
+  document.querySelector("#reminderList").innerHTML = reminderPage.items.length
+    ? reminderPage.items.map((item) => `<li><strong>${html(item.employeeName || item.name)}</strong><br />${html(item.message || `Chưa có báo cáo ngày ${today}.`)}</li>`).join("")
     : "<li>Tất cả TDV trong phạm vi đã báo cáo hôm nay.</li>";
+  document.querySelector("#lostSaleSearch").value = alertState.searches.lostSales;
+  document.querySelector("#reminderSearch").value = alertState.searches.reminders;
+  document.querySelector("#lostSalePagination").innerHTML = paginationMarkup("alert:lostSales", lostPage, alertState.pageSize);
+  document.querySelector("#reminderPagination").innerHTML = paginationMarkup("alert:reminders", reminderPage, alertState.pageSize);
 }
 
 function getFormObject(form) {
@@ -322,18 +386,6 @@ async function postAdmin(resource, data, action = "upsert") {
   });
   await loadData();
   showNotice(action === "deactivate" || action === "remove" ? "Đã xóa dữ liệu." : "Đã lưu dữ liệu.");
-}
-
-function downloadFile(fileName, content, type = "application/json") {
-  const blob = new Blob([content], { type });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
 }
 
 function parseCsv(text) {
@@ -482,7 +534,7 @@ function renderAdmin() {
         </div>
       </li>`)
     .join("");
-  document.querySelector("#employeeAdminPagination").innerHTML = paginationMarkup("admin:employee", employeePage, true);
+  document.querySelector("#employeeAdminPagination").innerHTML = paginationMarkup("admin:employee", employeePage, adminState.pageSize);
 
   const productPage = adminPage("product", products, (product) => `${product.id} ${product.name} ${product.dosageForm}`);
   document.querySelector("#productAdminList").innerHTML = productPage.items
@@ -496,7 +548,7 @@ function renderAdmin() {
         </div>
       </li>`)
     .join("");
-  document.querySelector("#productAdminPagination").innerHTML = paginationMarkup("admin:product", productPage, true);
+  document.querySelector("#productAdminPagination").innerHTML = paginationMarkup("admin:product", productPage, adminState.pageSize);
 
   const customerPage = adminPage("customer", customers, (customer) => `${customer.id} ${customer.name} ${customer.type}`);
   document.querySelector("#customerAdminList").innerHTML = customerPage.items
@@ -510,7 +562,7 @@ function renderAdmin() {
         </div>
       </li>`)
     .join("");
-  document.querySelector("#customerAdminPagination").innerHTML = paginationMarkup("admin:customer", customerPage, true);
+  document.querySelector("#customerAdminPagination").innerHTML = paginationMarkup("admin:customer", customerPage, adminState.pageSize);
 
   const territoryPage = adminPage("territory", territories, (territory) => `${territory.id} ${territory.name} ${territory.region}`);
   document.querySelector("#territoryAdminList").innerHTML = territoryPage.items
@@ -524,38 +576,85 @@ function renderAdmin() {
         </div>
       </li>`)
     .join("");
-  document.querySelector("#territoryAdminPagination").innerHTML = paginationMarkup("admin:territory", territoryPage, true);
+  document.querySelector("#territoryAdminPagination").innerHTML = paginationMarkup("admin:territory", territoryPage, adminState.pageSize);
 
-  document.querySelector("#territoryAssignmentList").innerHTML = (state.employeeTerritories || [])
+  const territoryAssignments = (state.employeeTerritories || []).map((assignment) => ({
+    ...assignment,
+    employeeName: byId(employees, assignment.employeeId)?.name || assignment.employeeId,
+    territoryName: byId(territories, assignment.territoryId)?.name || assignment.territoryId
+  }));
+  const territoryAssignmentPage = adminPage("employeeTerritory", territoryAssignments, (item) => `${item.employeeName} ${item.territoryName}`);
+  document.querySelector("#territoryAssignmentList").innerHTML = territoryAssignmentPage.items
     .map((assignment) => {
-      const employee = byId(employees, assignment.employeeId) || {};
-      const territory = byId(territories, assignment.territoryId) || {};
       return `<li>
-        <strong>${html(employee.name || assignment.employeeId)}</strong><br />
-        ${html(territory.name || assignment.territoryId)}${assignment.isPrimary ? " · Địa bàn chính" : ""}
+        <strong>${html(assignment.employeeName)}</strong><br />
+        ${html(assignment.territoryName)}${assignment.isPrimary ? " · Địa bàn chính" : ""}
         <div class="inline-actions">
           <button class="danger-button" data-remove-territory="${html(assignment.employeeId)}:${html(assignment.territoryId)}">Xóa phân công</button>
         </div>
       </li>`;
     })
     .join("") || "<li>Chưa có phân công địa bàn.</li>";
+  document.querySelector("#territoryAssignmentPagination").innerHTML = paginationMarkup("admin:employeeTerritory", territoryAssignmentPage, adminState.pageSize);
 
-  document.querySelector("#customerAssignmentList").innerHTML = (state.employeeCustomers || [])
+  const customerAssignments = (state.employeeCustomers || []).map((assignment) => ({
+    ...assignment,
+    employeeName: byId(employees, assignment.employeeId)?.name || assignment.employeeId,
+    customerName: byId(customers, assignment.customerId)?.name || assignment.customerId
+  }));
+  const customerAssignmentPage = adminPage("employeeCustomer", customerAssignments, (item) => `${item.employeeName} ${item.customerName}`);
+  document.querySelector("#customerAssignmentList").innerHTML = customerAssignmentPage.items
     .map((assignment) => {
-      const employee = byId(employees, assignment.employeeId) || {};
-      const customer = byId(customers, assignment.customerId) || {};
       return `<li>
-        <strong>${html(employee.name || assignment.employeeId)}</strong><br />
-        ${html(customer.name || assignment.customerId)}
+        <strong>${html(assignment.employeeName)}</strong><br />
+        ${html(assignment.customerName)}
         <div class="inline-actions">
           <button class="danger-button" data-remove-customer="${html(assignment.employeeId)}:${html(assignment.customerId)}">Xóa phân công</button>
         </div>
       </li>`;
     })
     .join("") || "<li>Chưa có phân công khách hàng.</li>";
+  document.querySelector("#customerAssignmentPagination").innerHTML = paginationMarkup("admin:employeeCustomer", customerAssignmentPage, adminState.pageSize);
 }
 
 function bindForms() {
+  document.querySelector("nav").addEventListener("click", (event) => {
+    const link = event.target.closest("[data-view]");
+    if (!link) return;
+    event.preventDefault();
+    showView(link.dataset.view);
+  });
+
+  const bindOperationFilter = (formId, resource) => {
+    const form = document.querySelector(formId);
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      operationState[resource].filters = Object.fromEntries(new FormData(form).entries());
+      try {
+        await loadOperationPage(resource, 1);
+        render();
+      } catch (error) {
+        showNotice(error.message);
+      }
+    });
+    form.addEventListener("reset", () => {
+      setTimeout(async () => {
+        operationState[resource].filters = resource === "tenders"
+          ? { status: "", search: "" }
+          : { period: dashboardState.period, search: "" };
+        try {
+          await loadOperationPage(resource, 1);
+          render();
+        } catch (error) {
+          showNotice(error.message);
+        }
+      }, 0);
+    });
+  };
+  bindOperationFilter("#prescriptionFilter", "prescriptions");
+  bindOperationFilter("#salesFilter", "sales");
+  bindOperationFilter("#tenderFilter", "tenders");
+
   document.querySelector("#reportingPeriod").addEventListener("change", async (event) => {
     try {
       await refreshReporting(event.target.value);
@@ -575,6 +674,12 @@ function bindForms() {
       renderAdmin();
       return;
     }
+    if (resource.startsWith("alert:")) {
+      const alertResource = resource.split(":")[1];
+      alertState.pages[alertResource] = page;
+      renderAlerts();
+      return;
+    }
     try {
       await loadOperationPage(resource, page);
       render();
@@ -592,6 +697,25 @@ function bindForms() {
     const input = document.querySelector(`[data-admin-search='${resource}']`);
     input.focus();
     input.setSelectionRange(input.value.length, input.value.length);
+  });
+
+  document.querySelector("#lostSaleSearch").addEventListener("input", (event) => {
+    alertState.searches.lostSales = event.target.value;
+    alertState.pages.lostSales = 1;
+    renderAlerts();
+    document.querySelector("#lostSaleSearch").focus();
+  });
+  document.querySelector("#reminderSearch").addEventListener("input", (event) => {
+    alertState.searches.reminders = event.target.value;
+    alertState.pages.reminders = 1;
+    renderAlerts();
+    document.querySelector("#reminderSearch").focus();
+  });
+  document.querySelector("#alerts").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-alert-tab]");
+    if (!button) return;
+    alertState.activeTab = button.dataset.alertTab;
+    renderAlerts();
   });
 
   document.querySelector("#loginForm").addEventListener("submit", async (event) => {
@@ -835,17 +959,6 @@ function bindForms() {
     }, 0);
   });
 
-  document.querySelector("#exportData").addEventListener("click", async () => {
-    if (!apiReady) return showNotice("Database chưa sẵn sàng, chưa thể export.");
-
-    try {
-      const payload = await api("/api/v1/data-transfer");
-      downloadFile(`cpc1hn-export-${currentDate()}.json`, JSON.stringify(payload, null, 2));
-    } catch (error) {
-      showNotice(error.message);
-    }
-  });
-
   document.querySelector("#importForm select[name='resource']").addEventListener("change", (event) => {
     const fileName = sampleCsvByResource[event.target.value] || "tb_nhan_su.csv";
     const link = document.querySelector("#sampleCsvLink");
@@ -891,8 +1004,8 @@ function bindForms() {
 }
 
 function setDefaultDates() {
-  document.querySelector("input[name='date']").value = currentDate();
-  document.querySelector("input[name='period']").value = currentPeriod();
+  document.querySelector("#prescriptionForm input[name='date']").value = currentDate();
+  document.querySelector("#salesForm input[name='period']").value = currentPeriod();
 }
 
 setDefaultDates();

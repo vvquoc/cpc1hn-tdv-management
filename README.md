@@ -1,73 +1,66 @@
-# CPC1HN TDV Management - Core MVP
+# CPC1HN TDV Management
 
-MVP này bám quy trình Netlify Build from Git:
+Hệ thống nội bộ quản lý trình dược viên, kê đơn, doanh số, thầu và cảnh báo mất sale. Website cập nhật trực tiếp vào PostgreSQL theo hai vai trò: `Nhân viên` và `Quản lý`.
 
-1. Push repository lên GitHub/GitLab/Bitbucket/Azure DevOps.
-2. Tạo project trên Netlify từ Git repository.
-3. Netlify chạy `npm run build`.
-4. Netlify deploy thư mục `dist`.
-5. Netlify đóng gói API trong `netlify/functions`.
+## Triển khai bằng tài khoản Netlify mới
 
-## Build settings
+1. Trong Netlify, chọn **Add new project > Import an existing project** và kết nối repository này.
+2. Trong project vừa tạo, mở **Database** và tạo Netlify Database cho production.
+3. Mở **Project configuration > Environment variables**, thêm:
+   - Key: `AUTH_TOKEN_SECRET`
+   - Value: chuỗi ngẫu nhiên tối thiểu 32 ký tự.
+   - Scope: `All scopes`.
+   - Deploy contexts: cùng một giá trị cho tất cả context.
+4. Trigger production deploy. Netlify tự đọc `netlify.toml`, chạy migration và build website.
+5. Kiểm tra `/api/v1/health`, sau đó đăng nhập bằng tài khoản quản lý ban đầu.
+
+Không cần tự nhập `NETLIFY_DB_URL` khi dùng Netlify Database. Nếu dùng PostgreSQL bên ngoài, đặt connection string vào `CPC1_DATABASE_URL`.
+
+## Cấu hình build
 
 - Build command: `npm run build`
 - Publish directory: `dist`
-- Functions directory: `netlify/functions`
-- Node version: `22`
+- Functions directory: `netlify/functions-v2`
+- Node.js: `22`
+- Database migrations: `netlify/database/migrations`
 
-Các cấu hình trên đã được khai báo trong `netlify.toml`, nên khi deploy từ Git, Netlify sẽ ưu tiên file này hơn cấu hình nhập tay trong UI.
+Toàn bộ cấu hình đã nằm trong `netlify.toml`; không cần nhập lại Build settings trên giao diện Netlify.
 
-## Core MVP scope
+## Dữ liệu khi đổi tài khoản Netlify
 
-- Dashboard theo vai trò và phạm vi địa bàn.
-- Nhập kê đơn hằng ngày.
-- Nhập doanh số thực tế theo tháng.
-- Theo dõi và cập nhật trạng thái gói thầu.
-- Admin/Manager quản trị nhân sự, tài khoản, địa bàn, sản phẩm, khách hàng và phân công.
-- Quét phòng mạch mất sale trong 4 tháng liên tục.
-- Danh sách TDV chưa gửi báo cáo trong ngày.
-- Migration PostgreSQL ban đầu tại `migrations/001_core_schema.sql`.
+Database của project Netlify mới là database mới. Repo chỉ chứa schema, migration, tài khoản quản lý ban đầu và file mẫu; không chứa DATA SALE thật hoặc secret.
 
-## Local check
+Sau khi deploy:
+
+1. Đăng nhập tài khoản quản lý.
+2. Mở **Quản trị > Import dữ liệu**.
+3. Tải file mẫu Excel/CSV nếu cần.
+4. Import DATA SALE hoặc các danh mục thật.
+
+DATA SALE import đầy đủ hoạt động theo snapshot: dòng cùng nguồn được cập nhật, dòng không còn trong snapshot mới được loại bỏ sau khi import hoàn tất. Dữ liệu website tại cùng tháng + khách hàng + sản phẩm được ưu tiên hơn dữ liệu DATA SALE.
+
+## Kiểm tra trước deploy
 
 ```bash
+npm ci
+npm run uat
 npm run build
 ```
 
-Mở `dist/index.html` để xem giao diện tĩnh sau build. Nếu dùng Netlify CLI, chạy:
+Chạy local với Netlify Functions:
 
 ```bash
-npx netlify dev
+netlify dev
 ```
 
-## API MVP
+## Chức năng chính
 
-- `/.netlify/functions/health`
-- `/.netlify/functions/bootstrap-data`
-- `/.netlify/functions/prescriptions`
-- `/.netlify/functions/sales`
-- `/.netlify/functions/tenders`
-- `/.netlify/functions/admin-data`
-- `/.netlify/functions/lost-sales-trigger`
-- `/.netlify/functions/daily-reminders`
+- Dashboard theo kỳ và phạm vi được phân quyền.
+- Nhập, lọc và phân trang kê đơn.
+- Nhập, lọc và phân trang doanh số.
+- Theo dõi, lọc và cập nhật gói thầu.
+- Cảnh báo phòng mạch mất sale bốn tháng liên tục.
+- Quản lý tài khoản, nhân sự, địa bàn, sản phẩm, khách hàng và phân công.
+- Import dữ liệu bằng file mẫu ngay trên website.
 
-Trong production, các endpoint public route tương ứng là:
-
-- `/api/v1/health`
-- `/api/v1/bootstrap-data`
-- `/api/v1/prescriptions`
-- `/api/v1/sales`
-- `/api/v1/tenders`
-- `/api/v1/admin-data`
-- `/api/v1/lost-sales-trigger`
-- `/api/v1/daily-reminders`
-
-## Database
-
-File `migrations/001_core_schema.sql` là schema PostgreSQL lõi. Website là kênh cập nhật dữ liệu chính theo role; Google Sheets chỉ còn là file chuẩn bị/import phụ trợ nếu cần.
-
-## Role workflow
-
-- `MR`: nhập kê đơn, nhập doanh số trong phạm vi khách hàng được phân công, xem KPI/cảnh báo cá nhân.
-- `Supervisor`: xem dữ liệu theo địa bàn phụ trách và cập nhật tiến độ thầu thuộc vùng.
-- `Manager/Admin`: quản trị dữ liệu thật trực tiếp trên website, gồm tài khoản nhân sự, địa bàn, sản phẩm, khách hàng và phân công.
+Nhân sự được import không tự động trở thành tài khoản đăng nhập. Chỉ hồ sơ có `username` và mật khẩu trong `auth_credentials` mới đăng nhập được.

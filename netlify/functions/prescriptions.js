@@ -22,6 +22,10 @@ exports.handler = async (event) => {
         params.push(query.period);
         filters.push(`to_char(r.ngay_bao_cao,'YYYY-MM')=$${params.length}`);
       }
+      if (query.search) {
+        params.push(`%${String(query.search).trim()}%`);
+        filters.push(`(k.ten_khach_hang ilike $${params.length} or p.ten_san_pham ilike $${params.length} or n.ten_nhan_vien ilike $${params.length})`);
+      }
       params.push(pageSize, offset);
       const rows = (await getPool().query(`select r.*,to_char(r.ngay_bao_cao,'YYYY-MM-DD') as report_date,k.ten_khach_hang,p.ten_san_pham,n.ten_nhan_vien,count(*) over()::int as total
         from tb_ke_don r join tb_khach_hang k on k.id_khach_hang=r.id_khach_hang

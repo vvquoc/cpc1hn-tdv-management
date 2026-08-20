@@ -205,6 +205,21 @@ check("UAT-AUTO-13", "DATA SALE schema preserves the 19-column source grain", ()
   assert(exists("docs/cpc1-tdv-management/dbdiagram/cpc1-tdv-management.sql"), "Missing generated PostgreSQL schema");
 });
 
+check("UAT-AUTO-14", "Operational UI is bounded, filtered and split into independent screens", () => {
+  const html = read("src/index.html");
+  const app = read("src/app.js");
+  const css = read("src/styles.css");
+  assert(!html.includes("Core MVP"), "Legacy Core MVP heading is still visible");
+  assert(!html.includes("Export JSON") && !html.includes('id="exportData"'), "JSON export is still exposed");
+  for (const id of ["prescriptionFilter", "salesFilter", "tenderFilter", "lostSalePagination", "reminderPagination", "territoryAssignmentPagination", "customerAssignmentPagination"]) {
+    assert(html.includes(`id="${id}"`), `Missing bounded/filter control ${id}`);
+  }
+  assert(html.includes("data-view-panel") && app.includes("showView"), "Screens are not independently navigated");
+  assert(app.includes("pageSize: 6") && css.includes("max-height: 410px"), "Long lists are not bounded");
+  assert(read("netlify/functions/prescriptions.js").includes("query.search"), "Prescription search is missing server-side");
+  assert(read("netlify/functions/tenders.js").includes("query.status"), "Tender status filter is missing server-side");
+});
+
 const failed = checks.filter((item) => item.status === "FAIL");
 for (const item of checks) {
   const detail = item.detail ? ` - ${item.detail}` : "";

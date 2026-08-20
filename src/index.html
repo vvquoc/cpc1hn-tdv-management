@@ -34,28 +34,24 @@
           </div>
         </div>
         <nav aria-label="Điều hướng chính">
-          <a href="#dashboard">Dashboard</a>
-          <a href="#prescription">Kê đơn</a>
-          <a href="#sales">Doanh số</a>
-          <a href="#tender">Thầu</a>
-          <a href="#alerts">Cảnh báo</a>
-          <a href="#admin" data-admin-only>Quản trị</a>
+          <a class="active" href="#dashboard" data-view="dashboard">Dashboard</a>
+          <a href="#prescription" data-view="prescription">Kê đơn</a>
+          <a href="#sales" data-view="sales">Doanh số</a>
+          <a href="#tender" data-view="tender">Thầu</a>
+          <a href="#alerts" data-view="alerts">Cảnh báo</a>
+          <a href="#admin" data-view="admin" data-admin-only>Quản trị</a>
         </nav>
       </aside>
 
       <main>
         <header class="topbar">
-          <div>
-            <h1>Core MVP</h1>
-            <p>Theo dõi KPI, kê đơn, doanh số và tiến độ thầu theo phân quyền địa bàn.</p>
-          </div>
           <div class="account-box">
             <span id="activeAccount"></span>
             <button id="logoutButton" class="secondary-button" type="button">Đăng xuất</button>
           </div>
         </header>
 
-        <section id="dashboard" class="section">
+        <section id="dashboard" class="section" data-view-panel="dashboard">
           <div class="section-heading">
             <h2>Tổng quan</h2>
             <div class="reporting-controls">
@@ -83,7 +79,7 @@
           </div>
         </section>
 
-        <section id="prescription" class="section">
+        <section id="prescription" class="section" data-view-panel="prescription" hidden>
           <div class="section-heading">
             <h2>Nhập kê đơn</h2>
           </div>
@@ -93,6 +89,12 @@
             <label>Sản phẩm<select name="productId" required></select></label>
             <label>Số lượng<input name="quantity" type="number" min="1" value="1" required /></label>
             <button type="submit">Ghi nhận kê đơn</button>
+          </form>
+          <form id="prescriptionFilter" class="filter-bar">
+            <label>Kỳ<input name="period" type="month" /></label>
+            <label class="filter-search">Tìm kiếm<input name="search" type="search" placeholder="Khách hàng, sản phẩm hoặc TDV" /></label>
+            <button type="submit" class="secondary-button">Lọc</button>
+            <button type="reset" class="text-button">Đặt lại</button>
           </form>
           <div class="table-wrap">
             <table>
@@ -112,7 +114,7 @@
           <div id="prescriptionPagination" class="pagination"></div>
         </section>
 
-        <section id="sales" class="section">
+        <section id="sales" class="section" data-view-panel="sales" hidden>
           <div class="section-heading">
             <h2>Doanh số thực tế</h2>
           </div>
@@ -122,6 +124,12 @@
             <label>Sản phẩm<select name="productId" required></select></label>
             <label>Doanh số<input name="amount" type="number" min="0" step="1000" required /></label>
             <button type="submit">Ghi nhận doanh số</button>
+          </form>
+          <form id="salesFilter" class="filter-bar">
+            <label>Kỳ<input name="period" type="month" /></label>
+            <label class="filter-search">Tìm kiếm<input name="search" type="search" placeholder="Khách hàng hoặc sản phẩm" /></label>
+            <button type="submit" class="secondary-button">Lọc</button>
+            <button type="reset" class="text-button">Đặt lại</button>
           </form>
           <div class="table-wrap">
             <table>
@@ -139,7 +147,7 @@
           <div id="salesPagination" class="pagination"></div>
         </section>
 
-        <section id="tender" class="section">
+        <section id="tender" class="section" data-view-panel="tender" hidden>
           <div class="section-heading">
             <h2>Tiến độ thầu</h2>
           </div>
@@ -160,6 +168,20 @@
             <label>Giá dự thầu<input name="bidPrice" type="number" min="0" step="1000" value="0" /></label>
             <button type="submit">Lưu gói thầu</button>
           </form>
+          <form id="tenderFilter" class="filter-bar">
+            <label>Trạng thái
+              <select name="status">
+                <option value="">Tất cả</option>
+                <option value="DangLamHoSo">Đang làm hồ sơ</option>
+                <option value="ChoKetQua">Chờ kết quả</option>
+                <option value="TrungThau">Trúng thầu</option>
+                <option value="TruotThau">Trượt thầu</option>
+              </select>
+            </label>
+            <label class="filter-search">Tìm kiếm<input name="search" type="search" placeholder="Mã thầu, khách hàng hoặc sản phẩm" /></label>
+            <button type="submit" class="secondary-button">Lọc</button>
+            <button type="reset" class="text-button">Đặt lại</button>
+          </form>
           <div class="table-wrap">
             <table>
               <thead>
@@ -178,7 +200,7 @@
           <div id="tenderPagination" class="pagination"></div>
         </section>
 
-        <section id="admin" class="section" data-admin-only>
+        <section id="admin" class="section" data-view-panel="admin" data-admin-only hidden>
           <div class="section-heading">
             <h2>Quản trị dữ liệu</h2>
             <span id="accountSummary"></span>
@@ -190,18 +212,17 @@
             <button type="button" class="tab-button" data-admin-tab="product">Sản phẩm</button>
             <button type="button" class="tab-button" data-admin-tab="territory">Địa bàn</button>
             <button type="button" class="tab-button" data-admin-tab="assignment">Phân quyền</button>
-            <button type="button" class="tab-button" data-admin-tab="import">Import / Export</button>
+            <button type="button" class="tab-button" data-admin-tab="import">Import dữ liệu</button>
           </div>
 
           <div class="data-transfer" data-admin-panel="import" hidden>
             <div>
-              <h3>Import / Export</h3>
+              <h3>Import dữ liệu</h3>
               <p>Tải file mẫu, điền dữ liệu thật, rồi import theo từng nhóm dữ liệu.</p>
             </div>
             <div class="transfer-actions">
               <a class="button-link secondary-button" href="./templates/cpc1hn_data_import_template.xlsx" download>Tải file mẫu Excel</a>
               <a id="sampleCsvLink" class="button-link secondary-button" href="./templates/csv/tb_nhan_su.csv" download>Tải CSV mẫu theo nhóm</a>
-              <button id="exportData" type="button">Export JSON</button>
             </div>
             <form id="importForm" class="form-grid">
               <label>Nhóm dữ liệu
@@ -366,28 +387,40 @@
             </div>
             <div data-admin-panel="assignment" hidden>
               <h3>Phân địa bàn hiện có</h3>
+              <input class="admin-search" data-admin-search="employeeTerritory" type="search" placeholder="Tìm nhân viên hoặc địa bàn" />
               <ul id="territoryAssignmentList" class="list"></ul>
+              <div id="territoryAssignmentPagination" class="pagination"></div>
             </div>
             <div data-admin-panel="assignment" hidden>
               <h3>Phân khách hàng hiện có</h3>
+              <input class="admin-search" data-admin-search="employeeCustomer" type="search" placeholder="Tìm nhân viên hoặc khách hàng" />
               <ul id="customerAssignmentList" class="list"></ul>
+              <div id="customerAssignmentPagination" class="pagination"></div>
             </div>
           </div>
         </section>
 
-        <section id="alerts" class="section">
+        <section id="alerts" class="section" data-view-panel="alerts" hidden>
           <div class="section-heading">
             <h2>Cảnh báo & nhắc nhở</h2>
             <button id="runLostSale">Quét mất sale</button>
           </div>
-          <div class="split">
-            <div>
+          <div class="alert-tabs" role="tablist" aria-label="Nhóm cảnh báo">
+            <button type="button" class="tab-button active" data-alert-tab="lostSales">Mất sale</button>
+            <button type="button" class="tab-button" data-alert-tab="reminders">Chưa báo cáo</button>
+          </div>
+          <div class="alert-content">
+            <div data-alert-panel="lostSales">
               <h3>Phòng mạch mất sale</h3>
+              <input id="lostSaleSearch" class="admin-search" type="search" placeholder="Tìm phòng mạch" />
               <ul id="lostSaleList" class="list"></ul>
+              <div id="lostSalePagination" class="pagination"></div>
             </div>
-            <div>
+            <div data-alert-panel="reminders" hidden>
               <h3>Chưa báo cáo hôm nay</h3>
+              <input id="reminderSearch" class="admin-search" type="search" placeholder="Tìm nhân viên" />
               <ul id="reminderList" class="list"></ul>
+              <div id="reminderPagination" class="pagination"></div>
             </div>
           </div>
         </section>
