@@ -111,12 +111,27 @@ function assertCustomerAccess(data, user, customerId) {
   }
 }
 
+async function assertDatabaseCustomerAccess(user, customerId, client) {
+  if (isManager(user)) return;
+  const sql = `select 1 from employee_customers ec
+    join tb_khach_hang k on k.id_khach_hang=ec.id_khach_hang and k.trang_thai='Active'
+    where ec.id_nhan_vien=$1 and ec.id_khach_hang=$2`;
+  const rows = client ? (await client.query(sql, [user.id, customerId])).rows : await query(sql, [user.id, customerId]);
+  if (!rows.length) {
+    const error = new Error(`Customer outside scope: ${customerId}`);
+    error.statusCode = 403;
+    error.publicMessage = "Khách hàng không thuộc phạm vi phụ trách.";
+    throw error;
+  }
+}
+
 module.exports = {
   requireUser,
   requireDatabaseUser,
   isAdmin,
   customerScopeSql,
   assertCustomerAccess,
+  assertDatabaseCustomerAccess,
   createToken,
   verifyToken
 };

@@ -26,10 +26,18 @@ function parseBody(event) {
 }
 
 function handleError(error) {
-  const statusCode = error.statusCode || 500;
+  const databaseErrors = {
+    "23505": [409, "Dữ liệu đã tồn tại."],
+    "23503": [400, "Dữ liệu liên quan không tồn tại hoặc vẫn đang được sử dụng."],
+    "23514": [400, "Giá trị dữ liệu không hợp lệ."],
+    "22P02": [400, "Định dạng dữ liệu không hợp lệ."],
+    "22007": [400, "Ngày tháng không hợp lệ."]
+  };
+  const mapped = databaseErrors[error.code];
+  const statusCode = error.statusCode || mapped?.[0] || 500;
   if (statusCode >= 500) console.error(error);
   return json(statusCode, {
-    error: error.publicMessage || "Internal server error"
+    error: error.publicMessage || mapped?.[1] || "Internal server error"
   });
 }
 

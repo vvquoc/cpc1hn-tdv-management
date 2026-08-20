@@ -51,19 +51,19 @@ const sheets = [
   {
     name: "tb_nhan_su",
     title: "Nhân sự",
-    note: "Email phải đúng email đăng nhập. chuc_vu chỉ dùng NhanVien hoặc QuanLy.",
-    headers: ["id_nhan_vien", "ten_nhan_vien", "email", "chuc_vu", "trang_thai"],
-    required: ["id_nhan_vien", "ten_nhan_vien", "email", "chuc_vu", "trang_thai"],
+    note: "Email không bắt buộc. tai_khoan và mat_khau dùng để tạo tài khoản đăng nhập; chuc_vu chỉ dùng NhanVien hoặc QuanLy.",
+    headers: ["id_nhan_vien", "ten_nhan_vien", "email", "tai_khoan", "mat_khau", "chuc_vu", "trang_thai"],
+    required: ["id_nhan_vien", "ten_nhan_vien", "tai_khoan", "mat_khau", "chuc_vu", "trang_thai"],
     validations: { chuc_vu: ["NhanVien", "QuanLy"], trang_thai: ["Active", "Inactive"] },
     examples: [
-      ["NV-DN-01", "Nguyễn Minh Anh", "nhanvien.danang@cpc1hn.vn", "NhanVien", "Active"],
-      ["NV-QL-01", "Phạm Quốc Bảo", "quanly@cpc1hn.vn", "QuanLy", "Active"]
+      ["NV-DN-01", "Nguyễn Minh Anh", "", "15801", "Nhanvien@123", "NhanVien", "Active"],
+      ["NV-QL-01", "Phạm Quốc Bảo", "quanly@cpc1hn.vn", "15802", "Quanly@123", "QuanLy", "Active"]
     ]
   },
   {
     name: "employee_territories",
     title: "Phân quyền địa bàn",
-    note: "Một nhân sự có thể có nhiều địa bàn. Dùng để lọc quyền xem/nhập theo email.",
+    note: "Một nhân sự có thể có nhiều địa bàn. Dùng để lọc quyền xem/nhập theo tài khoản.",
     headers: ["id_nhan_vien", "id_dia_ban", "is_primary"],
     required: ["id_nhan_vien", "id_dia_ban", "is_primary"],
     validations: { is_primary: ["TRUE", "FALSE"] },

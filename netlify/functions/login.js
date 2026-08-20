@@ -1,19 +1,7 @@
-const crypto = require("node:crypto");
 const { createToken } = require("./shared/auth");
-const { loadData, withTerritories } = require("./shared/store");
+const { verifyPassword } = require("./shared/credentials");
+const { one, query } = require("./shared/db");
 const { handleError, json, methodNotAllowed, parseBody } = require("./shared/http");
-
-function verifyPassword(password, credential) {
-  const expected = Buffer.from(credential.passwordHash, "hex");
-  const actual = crypto.pbkdf2Sync(
-    String(password || ""),
-    credential.passwordSalt,
-    Number(credential.iterations || 210000),
-    expected.length,
-    "sha256"
-  );
-  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
-}
 
 exports.handler = async (event) => {
   if (event.httpMethod !== "POST") return methodNotAllowed();
@@ -22,24 +10,26 @@ exports.handler = async (event) => {
     const body = parseBody(event);
     const username = String(body.username || "").trim();
     const password = String(body.password || "");
-    const data = await loadData(event);
-    const credential = data.credentials.find((item) => item.username === username);
-    const employee = credential && data.employees.find((item) => item.id === credential.employeeId && item.status !== "Inactive");
+    const credential = await one(`select c.username,c.password_salt,c.password_hash,c.iterations,
+        n.id_nhan_vien,n.ten_nhan_vien,n.email,n.chuc_vu,n.trang_thai
+      from auth_credentials c
+      join tb_nhan_su n on n.id_nhan_vien=c.id_nhan_vien
+      where c.username=$1`, [username]);
 
-    if (!credential || !employee || !verifyPassword(password, credential)) {
+    if (!credential || credential.trang_thai !== "Active" || !verifyPassword(password, credential)) {
       return json(401, { error: "Sai tài khoản hoặc mật khẩu." });
     }
 
-    const token = createToken(employee.id);
-    const user = withTerritories(data, employee);
+    const territories = await query("select id_dia_ban from employee_territories where id_nhan_vien=$1 order by id_dia_ban", [credential.id_nhan_vien]);
+    const token = createToken(credential.id_nhan_vien);
     return json(200, {
       token,
       user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        territoryIds: user.territoryIds
+        id: credential.id_nhan_vien,
+        name: credential.ten_nhan_vien,
+        email: credential.email || "",
+        role: credential.chuc_vu,
+        territoryIds: territories.map((item) => item.id_dia_ban)
       }
     });
   } catch (error) {

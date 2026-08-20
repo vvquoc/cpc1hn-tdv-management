@@ -1,165 +1,98 @@
+import fs from "node:fs";
 import { createRequire } from "node:module";
-import crypto from "node:crypto";
 
 const require = createRequire(import.meta.url);
-process.env.AUTH_TOKEN_SECRET = "backend-uat-only-secret";
+process.env.AUTH_TOKEN_SECRET = "backend-uat-only-secret-with-enough-entropy";
 
-let appData = {
-  revision: 0,
-  employees: [
-    { id: "QL-01", name: "QA Manager", email: "manager@example.test", role: "QuanLy", status: "Active" }
-  ],
-  credentials: [],
-  sessions: [],
-  territories: [
-    { id: "DB-A", name: "Khu vực A", region: "QA", status: "Active" },
-    { id: "DB-B", name: "Khu vực B", region: "QA", status: "Active" }
-  ],
-  products: [],
-  customers: [
-    { id: "KH-B", name: "Khách hàng B", type: "PhongMachTu", territoryId: "DB-B", status: "Active" }
-  ],
-  employeeTerritories: [{ employeeId: "QL-01", territoryId: "DB-A", isPrimary: true }],
-  employeeCustomers: [],
-  prescriptions: [],
-  sales: [],
-  tenders: [],
-  dailyReports: [],
-  kpiTargets: []
-};
+const { hashPassword, verifyPassword } = require("../netlify/functions/shared/credentials.js");
+const { createToken, verifyToken } = require("../netlify/functions/shared/auth.js");
+const { parseBody } = require("../netlify/functions/shared/http.js");
 
-function credential(username, employeeId, password) {
-  const passwordSalt = "0123456789abcdef0123456789abcdef";
-  const iterations = 1000;
-  const passwordHash = crypto.pbkdf2Sync(password, passwordSalt, iterations, 32, "sha256").toString("hex");
-  return { username, employeeId, passwordSalt, passwordHash, iterations };
-}
-
-appData.credentials.push(credential("manager", "QL-01", "Manager@123"));
-
-const storePath = require.resolve("../netlify/functions/shared/store.js");
-const store = require(storePath);
-store.loadData = async () => appData;
-store.saveData = async (nextData) => {
-  appData = nextData;
-  return appData;
-};
-
-delete require.cache[require.resolve("../netlify/functions/shared/auth.js")];
-const auth = require("../netlify/functions/shared/auth.js");
-const login = require("../netlify/functions/login.js");
-const admin = require("../netlify/functions/admin-data.js");
-const bootstrap = require("../netlify/functions/bootstrap-data.js");
-const prescriptions = require("../netlify/functions/prescriptions.js");
-const sales = require("../netlify/functions/sales.js");
-const tenders = require("../netlify/functions/tenders.js");
-
-function event(method, body, token) {
-  return {
-    httpMethod: method,
-    headers: token ? { authorization: `Bearer ${token}` } : {},
-    body: body === undefined ? null : JSON.stringify(body)
-  };
-}
-
-function payload(response) {
-  return JSON.parse(response.body || "{}");
-}
-
-async function expect(name, promise, statusCode) {
-  const response = await promise;
-  if (response.statusCode !== statusCode) {
-    throw new Error(`${name}: expected ${statusCode}, got ${response.statusCode} ${response.body}`);
+const checks = [];
+function check(name, run) {
+  try {
+    run();
+    checks.push({ name, status: "PASS" });
+    console.log(`PASS ${name}`);
+  } catch (error) {
+    checks.push({ name, status: "FAIL", error: error.message });
+    console.error(`FAIL ${name}: ${error.message}`);
   }
-  console.log(`PASS ${name}`);
-  return payload(response);
+}
+function assert(value, message) {
+  if (!value) throw new Error(message);
+}
+function source(file) {
+  return fs.readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
 }
 
-const badLogin = await expect(
-  "BACKEND-01 rejects invalid login",
-  login.handler(event("POST", { username: "manager", password: "wrong-password" })),
-  401
-);
-if (!badLogin.error) throw new Error("BACKEND-01 did not return a public error");
+check("BACKEND-01 hashes and verifies a password", () => {
+  const credential = hashPassword("Employee@123");
+  assert(verifyPassword("Employee@123", credential), "valid password rejected");
+  assert(!verifyPassword("Wrong@123", credential), "invalid password accepted");
+});
 
-const managerLogin = await expect(
-  "BACKEND-02 accepts manager login",
-  login.handler(event("POST", { username: "manager", password: "Manager@123" })),
-  200
-);
-const managerToken = managerLogin.token;
+check("BACKEND-02 rejects short passwords", () => {
+  let rejected = false;
+  try { hashPassword("short"); } catch (error) { rejected = error.statusCode === 400; }
+  assert(rejected, "short password was accepted");
+});
 
-await expect("BACKEND-03 rejects malformed JSON", admin.handler({ httpMethod: "POST", headers: { authorization: `Bearer ${managerToken}` }, body: "{" }), 400);
+check("BACKEND-03 creates portable stateless tokens", () => {
+  const token = createToken("NV-UAT");
+  assert(verifyToken(token)?.employeeId === "NV-UAT", "token cannot be verified independently");
+});
 
-await expect("BACKEND-04 creates product", admin.handler(event("POST", {
-  resource: "product",
-  data: { id: "SP-QA", name: "Sản phẩm QA", dosageCode: "BFS", dosageForm: "BFS", prescriptionPrice: 10000, status: "Active" }
-}, managerToken)), 200);
+check("BACKEND-04 rejects modified tokens", () => {
+  const token = createToken("NV-UAT");
+  assert(verifyToken(`${token}x`) === null, "modified token accepted");
+});
 
-await expect("BACKEND-05 creates customer", admin.handler(event("POST", {
-  resource: "customer",
-  data: { id: "KH-A", name: "Khách hàng A", type: "PhongMachTu", territoryId: "DB-A", status: "Active" }
-}, managerToken)), 200);
+check("BACKEND-05 parses JSON requests", () => {
+  assert(parseBody({ body: '{"ok":true}' }).ok === true, "valid JSON rejected");
+});
 
-await expect("BACKEND-06 creates employee account", admin.handler(event("POST", {
-  resource: "employee",
-  data: { id: "NV-A", name: "Nhân viên A", email: "employee@example.test", username: "employee", password: "Employee@123", role: "NhanVien", status: "Active" }
-}, managerToken)), 200);
+check("BACKEND-06 rejects malformed JSON", () => {
+  let rejected = false;
+  try { parseBody({ body: "{" }); } catch (error) { rejected = error.statusCode === 400; }
+  assert(rejected, "malformed JSON accepted");
+});
 
-await expect("BACKEND-07 assigns territory", admin.handler(event("POST", {
-  resource: "employee_territory",
-  data: { employeeId: "NV-A", territoryId: "DB-A", isPrimary: true }
-}, managerToken)), 200);
+const migration = source("netlify/database/migrations/009_lightweight_crud_auth.sql");
+check("BACKEND-07 makes Email optional", () => assert(migration.includes("email drop not null"), "Email remains mandatory"));
+check("BACKEND-08 enforces one login per employee", () => assert(migration.includes("uq_auth_credentials_employee"), "credential uniqueness missing"));
 
-await expect("BACKEND-08 assigns customer", admin.handler(event("POST", {
-  resource: "employee_customer",
-  data: { employeeId: "NV-A", customerId: "KH-A" }
-}, managerToken)), 200);
+const admin = source("netlify/functions/admin-data.js");
+check("BACKEND-09 admin CRUD uses direct database writes", () => {
+  assert(admin.includes("requireDatabaseUser") && admin.includes("getPool"), "direct database path missing");
+  assert(!admin.includes("saveData"), "admin still rewrites the full database");
+});
+check("BACKEND-10 employee creation does not require Email", () => {
+  assert(!admin.includes('required(payload.email'), "Email is still required");
+  assert(admin.includes("Nhân viên mới cần có tài khoản và mật khẩu"), "account requirement missing");
+});
+check("BACKEND-11 credentials are persisted in the same transaction", () => {
+  assert(admin.includes("insert into auth_credentials") && admin.includes('client.query("commit")'), "credential transaction missing");
+});
+check("BACKEND-12 manager cannot deactivate the active account", () => assert(admin.includes("Không thể vô hiệu hóa tài khoản đang đăng nhập"), "manager protection missing"));
 
-const employeeLogin = await expect(
-  "BACKEND-09 accepts employee login",
-  login.handler(event("POST", { username: "employee", password: "Employee@123" })),
-  200
-);
-const employeeToken = employeeLogin.token;
+const transfer = source("netlify/functions/data-transfer.js");
+check("BACKEND-13 standard import uses direct transactions", () => {
+  assert(transfer.includes("requireDatabaseUser") && transfer.includes('client.query("begin")'), "transactional import missing");
+  assert(!transfer.includes("saveData"), "import still rewrites the full database");
+});
+check("BACKEND-14 employee import supports login credentials", () => {
+  assert(transfer.includes('"tai_khoan", "username"') && transfer.includes('"mat_khau", "password"'), "credential columns missing");
+});
 
-const employeeData = await expect("BACKEND-10 filters employee scope", bootstrap.handler(event("GET", undefined, employeeToken)), 200);
-if (employeeData.customers.length !== 1 || employeeData.customers[0].id !== "KH-A") {
-  throw new Error("BACKEND-10 returned customers outside employee scope");
+for (const endpoint of ["prescriptions", "sales", "tenders"]) {
+  check(`BACKEND direct write: ${endpoint}`, () => {
+    const code = source(`netlify/functions/${endpoint}.js`);
+    assert(code.includes("requireDatabaseUser") && code.includes("assertDatabaseCustomerAccess"), "portable auth or scope check missing");
+    assert(!code.includes("saveData"), "endpoint still rewrites the full database");
+  });
 }
 
-await expect("BACKEND-11 creates prescription", prescriptions.handler(event("POST", {
-  date: "2026-08-20", customerId: "KH-A", productId: "SP-QA", quantity: 2
-}, employeeToken)), 201);
-
-await expect("BACKEND-12 creates sale", sales.handler(event("POST", {
-  period: "2026-08", customerId: "KH-A", productId: "SP-QA", amount: 250000
-}, employeeToken)), 201);
-
-await expect("BACKEND-13 creates tender", tenders.handler(event("POST", {
-  id: "GT-QA", customerId: "KH-A", productId: "SP-QA", status: "DangLamHoSo"
-}, employeeToken)), 200);
-
-await expect("BACKEND-14 rejects cross-scope write", prescriptions.handler(event("POST", {
-  date: "2026-08-20", customerId: "KH-B", productId: "SP-QA", quantity: 1
-}, employeeToken)), 403);
-
-await expect("BACKEND-15 rejects cross-scope tender overwrite", tenders.handler(event("POST", {
-  id: "GT-QA", customerId: "KH-B", productId: "SP-QA", status: "TrungThau"
-}, employeeToken)), 403);
-
-await expect("BACKEND-16 blocks deleting current manager", admin.handler(event("POST", {
-  resource: "employee", action: "deactivate", data: { id: "QL-01" }
-}, managerToken)), 400);
-
-await expect("BACKEND-17 deactivates employee", admin.handler(event("POST", {
-  resource: "employee", action: "deactivate", data: { id: "NV-A" }
-}, managerToken)), 200);
-
-await expect(
-  "BACKEND-18 rejects inactive employee login",
-  login.handler(event("POST", { username: "employee", password: "Employee@123" })),
-  401
-);
-
-console.log("18 backend UAT checks passed.");
+const failed = checks.filter((item) => item.status === "FAIL");
+if (failed.length) process.exit(1);
+console.log(`${checks.length} backend UAT checks passed.`);

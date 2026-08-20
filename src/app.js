@@ -354,6 +354,21 @@ async function importDataSale(rows) {
   return imported;
 }
 
+async function importStandardData(resource, rows) {
+  const chunkSize = 250;
+  let imported = 0;
+  for (let index = 0; index < rows.length; index += chunkSize) {
+    const chunk = rows.slice(index, index + chunkSize);
+    const result = await api("/api/v1/data-transfer", {
+      method: "POST",
+      body: JSON.stringify({ resource, startRow: index + 2, rows: chunk })
+    });
+    imported += result.imported || 0;
+    showNotice(`Đang import: ${imported}/${rows.length} dòng.`);
+  }
+  return imported;
+}
+
 function fillForm(formId, data) {
   const form = document.querySelector(formId);
   Object.entries(data).forEach(([key, value]) => {
@@ -721,10 +736,7 @@ function bindForms() {
       const rows = parseCsv(await file.text());
       const imported = resource === "dataSale"
         ? await importDataSale(rows)
-        : (await api("/api/v1/data-transfer", {
-          method: "POST",
-          body: JSON.stringify({ resource, rows })
-        })).imported || 0;
+        : await importStandardData(resource, rows);
       showNotice(`Import xong ${imported} dòng.`);
       form.reset();
       await loadData();

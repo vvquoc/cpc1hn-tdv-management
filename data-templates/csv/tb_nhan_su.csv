@@ -1,3 +1,3 @@
-id_nhan_vien,ten_nhan_vien,email,chuc_vu,trang_thai
-NV-DN-01,Nguyễn Minh Anh,nhanvien.danang@cpc1hn.vn,NhanVien,Active
-NV-QL-01,Phạm Quốc Bảo,quanly@cpc1hn.vn,QuanLy,Active
+id_nhan_vien,ten_nhan_vien,email,tai_khoan,mat_khau,chuc_vu,trang_thai
+NV-DN-01,Nguyễn Minh Anh,,15801,Nhanvien@123,NhanVien,Active
+NV-QL-01,Phạm Quốc Bảo,quanly@cpc1hn.vn,15802,Quanly@123,QuanLy,Active
