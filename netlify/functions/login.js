@@ -1,6 +1,6 @@
 const crypto = require("node:crypto");
-const { hashToken } = require("./shared/auth");
-const { loadData, saveData, withTerritories } = require("./shared/store");
+const { createToken } = require("./shared/auth");
+const { loadData, withTerritories } = require("./shared/store");
 const { handleError, json, methodNotAllowed, parseBody } = require("./shared/http");
 
 function verifyPassword(password, credential) {
@@ -30,14 +30,7 @@ exports.handler = async (event) => {
       return json(401, { error: "Sai tài khoản hoặc mật khẩu." });
     }
 
-    const token = crypto.randomBytes(32).toString("hex");
-    data.sessions.push({
-      tokenHash: hashToken(token),
-      employeeId: employee.id,
-      expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
-    });
-    await saveData(data, event);
-
+    const token = createToken(employee.id);
     const user = withTerritories(data, employee);
     return json(200, {
       token,

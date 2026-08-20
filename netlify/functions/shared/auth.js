@@ -1,8 +1,39 @@
 const crypto = require("node:crypto");
 const { hasCustomerAccess, isManager, loadData, withTerritories } = require("./store");
 
-function hashToken(token) {
-  return crypto.createHash("sha256").update(token).digest("hex");
+function base64Url(value) {
+  return Buffer.from(JSON.stringify(value)).toString("base64url");
+}
+
+function signPayload(payload) {
+  if (!process.env.AUTH_TOKEN_SECRET) {
+    const error = new Error("Missing AUTH_TOKEN_SECRET");
+    error.statusCode = 500;
+    error.publicMessage = "Hệ thống chưa cấu hình khóa đăng nhập.";
+    throw error;
+  }
+  return crypto.createHmac("sha256", process.env.AUTH_TOKEN_SECRET).update(payload).digest("base64url");
+}
+
+function createToken(employeeId) {
+  const payload = base64Url({
+    employeeId,
+    expiresAt: Date.now() + 14 * 24 * 60 * 60 * 1000
+  });
+  return `${payload}.${signPayload(payload)}`;
+}
+
+function verifyToken(token) {
+  const [payload, signature] = String(token || "").split(".");
+  if (!payload || !signature || signature !== signPayload(payload)) return null;
+
+  try {
+    const data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+    if (!data.employeeId || Number(data.expiresAt) <= Date.now()) return null;
+    return data;
+  } catch {
+    return null;
+  }
 }
 
 function getBearerToken(event) {
@@ -21,8 +52,7 @@ async function requireUser(event) {
   }
 
   const data = await loadData(event);
-  const tokenHash = hashToken(token);
-  const session = (data.sessions || []).find((item) => item.tokenHash === tokenHash && new Date(item.expiresAt).getTime() > Date.now());
+  const session = verifyToken(token);
   if (!session) {
     const error = new Error("Invalid session");
     error.statusCode = 401;
@@ -64,5 +94,6 @@ module.exports = {
   isAdmin,
   customerScopeSql,
   assertCustomerAccess,
-  hashToken
+  createToken,
+  verifyToken
 };
