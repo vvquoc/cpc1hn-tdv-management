@@ -1,0 +1,3 @@
+id_khach_hang,ten_khach_hang,loai_khach_hang,dia_chi,dien_thoai,id_dia_ban,trang_thai
+KH_PM_DN_01,Phòng mạch Hải Châu,PhongMachTu,"Hải Châu, Đà Nẵng",,DB_DANANG,Active
+KH_BV_DN_01,Bệnh viện Đà Nẵng,BenhVien,"Hải Châu, Đà Nẵng",,DB_DANANG,Active
